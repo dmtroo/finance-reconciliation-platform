@@ -1,0 +1,50 @@
+version: 1
+
+products:
+  - product_id: PROD-CORE-M-EUR
+    product_name: Core Security Monthly EUR
+    product_family: CORE_SECURITY
+    billing_interval: MONTH
+    list_price_minor: 999
+    currency: EUR
+    selection_weight: 0.28
+
+  - product_id: PROD-CORE-M-USD
+    product_name: Core Security Monthly USD
+    product_family: CORE_SECURITY
+    billing_interval: MONTH
+    list_price_minor: 1099
+    currency: USD
+    selection_weight: 0.24
+
+  - product_id: PROD-PRIV-M-PLN
+    product_name: Privacy Monthly PLN
+    product_family: PRIVACY
+    billing_interval: MONTH
+    list_price_minor: 3999
+    currency: PLN
+    selection_weight: 0.15
+
+  - product_id: PROD-ID-M-GBP
+    product_name: Identity Monthly GBP
+    product_family: IDENTITY
+    billing_interval: MONTH
+    list_price_minor: 899
+    currency: GBP
+    selection_weight: 0.12
+
+  - product_id: PROD-CONN-M-SEK
+    product_name: Connectivity Monthly SEK
+    product_family: CONNECTIVITY
+    billing_interval: MONTH
+    list_price_minor: 10900
+    currency: SEK
+    selection_weight: 0.11
+
+  - product_id: PROD-CORE-Y-EUR
+    product_name: Core Security Annual EUR
+    product_family: CORE_SECURITY
+    billing_interval: YEAR
+    list_price_minor: 9999
+    currency: EUR
+    selection_weight: 0.10

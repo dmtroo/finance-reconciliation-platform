@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/finance-reconciliation/generator-config.schema.json",
+  "title": "Finance reconciliation synthetic generator configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "seed", "scenario", "date_range", "volume", "catalog", "behavior", "fx_reference", "anomalies", "output"],
+  "properties": {
+    "version": {"const": 1},
+    "seed": {"type": "integer", "minimum": 0},
+    "scenario": {"enum": ["clean", "with_anomalies"]},
+    "date_range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "as_of_date"],
+      "properties": {
+        "start": {"type": "string", "format": "date"},
+        "end": {"type": "string", "format": "date"},
+        "as_of_date": {"type": "string", "format": "date"}
+      }
+    },
+    "volume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["customer_count", "active_subscription_rate"],
+      "properties": {
+        "customer_count": {"type": "integer", "minimum": 1},
+        "active_subscription_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {"path": {"type": "string", "minLength": 1}}
+    },
+    "behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subscriptions", "invoicing", "payments", "refunds", "chargebacks", "settlements", "bank", "accounting"],
+      "properties": {
+        "subscriptions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cancelled_rate", "past_due_rate"],
+          "properties": {
+            "cancelled_rate": {"$ref": "#/$defs/probability"},
+            "past_due_rate": {"$ref": "#/$defs/probability"}
+          }
+        },
+        "invoicing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tax_rate"],
+          "properties": {"tax_rate": {"type": "number", "minimum": 0, "maximum": 1}}
+        },
+        "payments": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["first_attempt_decline_rate", "retry_after_decline_rate", "max_attempts", "payment_method_weights"],
+          "properties": {
+            "first_attempt_decline_rate": {"$ref": "#/$defs/probability"},
+            "retry_after_decline_rate": {"$ref": "#/$defs/probability"},
+            "max_attempts": {"type": "integer", "minimum": 1, "maximum": 10},
+            "payment_method_weights": {"$ref": "#/$defs/stringWeightMap"}
+          }
+        },
+        "refunds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["capture_refund_rate", "amount_fraction_weights", "min_delay_days", "max_delay_days"],
+          "properties": {
+            "capture_refund_rate": {"$ref": "#/$defs/probability"},
+            "amount_fraction_weights": {"$ref": "#/$defs/stringWeightMap"},
+            "min_delay_days": {"type": "integer", "minimum": 0},
+            "max_delay_days": {"type": "integer", "minimum": 0}
+          }
+        },
+        "chargebacks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["capture_chargeback_rate", "min_delay_days", "max_delay_days"],
+          "properties": {
+            "capture_chargeback_rate": {"$ref": "#/$defs/probability"},
+            "min_delay_days": {"type": "integer", "minimum": 0},
+            "max_delay_days": {"type": "integer", "minimum": 0}
+          }
+        },
+        "settlements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["delay_days_weights", "variable_fee_bps", "fixed_fee_eur_minor", "psp_fx_spread_bps_min", "psp_fx_spread_bps_max"],
+          "properties": {
+            "delay_days_weights": {"$ref": "#/$defs/stringWeightMap"},
+            "variable_fee_bps": {"type": "integer", "minimum": 0, "maximum": 10000},
+            "fixed_fee_eur_minor": {"type": "integer", "minimum": 0},
+            "psp_fx_spread_bps_min": {"type": "integer", "minimum": 0},
+            "psp_fx_spread_bps_max": {"type": "integer", "minimum": 0}
+          }
+        },
+        "bank": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["posting_delay_days_weights"],
+          "properties": {"posting_delay_days_weights": {"$ref": "#/$defs/stringWeightMap"}}
+        },
+        "accounting": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["posting_delay_days_weights"],
+          "properties": {"posting_delay_days_weights": {"$ref": "#/$defs/stringWeightMap"}}
+        }
+      }
+    },
+    "fx_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "path"],
+      "properties": {
+        "mode": {"enum": ["fixture", "ecb_cache"]},
+        "path": {"type": "string", "minLength": 1}
+      }
+    },
+    "anomalies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "types"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "types": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["duplicate_capture", "capture_amount_mismatch", "over_refund", "missing_settlement", "settlement_total_mismatch", "missing_bank_receipt", "bank_amount_mismatch", "missing_ledger_posting", "unbalanced_journal", "unmapped_product", "missing_fx_rate", "fx_rate_outlier"],
+          "properties": {
+            "duplicate_capture": {"$ref": "#/$defs/anomalyCount"},
+            "capture_amount_mismatch": {"$ref": "#/$defs/anomalyCount"},
+            "over_refund": {"$ref": "#/$defs/anomalyCount"},
+            "missing_settlement": {"$ref": "#/$defs/anomalyCount"},
+            "settlement_total_mismatch": {"$ref": "#/$defs/anomalyCount"},
+            "missing_bank_receipt": {"$ref": "#/$defs/anomalyCount"},
+            "bank_amount_mismatch": {"$ref": "#/$defs/anomalyCount"},
+            "missing_ledger_posting": {"$ref": "#/$defs/anomalyCount"},
+            "unbalanced_journal": {"$ref": "#/$defs/anomalyCount"},
+            "unmapped_product": {"$ref": "#/$defs/anomalyCount"},
+            "missing_fx_rate": {"$ref": "#/$defs/anomalyCount"},
+            "fx_rate_outlier": {"$ref": "#/$defs/anomalyCount"}
+          }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "format", "include_control_manifest"],
+      "properties": {
+        "root": {"type": "string", "minLength": 1},
+        "format": {"const": "csv"},
+        "include_control_manifest": {"type": "boolean"}
+      }
+    }
+  },
+  "$defs": {
+    "probability": {"type": "number", "minimum": 0, "maximum": 1},
+    "anomalyCount": {"type": "integer", "minimum": 0, "maximum": 100},
+    "stringWeightMap": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1}
+    }
+  }
+}
