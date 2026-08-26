@@ -23,3 +23,7 @@ dbt/dbt_packages/
 
 # Local Postgres / misc
 *.log
+
+# Runtime external-source extracts / caches
+data/external/*
+!data/external/.gitkeep
