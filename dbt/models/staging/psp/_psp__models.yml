@@ -1,0 +1,204 @@
+version: 2
+
+models:
+  - name: stg_psp__payment_attempts
+    description: >
+      Cleaned PSP payment attempts. One row per payment attempt.
+      Source minor-unit amounts are converted to decimal transaction-
+      currency amounts. No invoice reconciliation is performed.
+    columns:
+      - name: payment_attempt_id
+        description: PSP payment attempt identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: invoice_id
+        description: Billing invoice identifier reported to the PSP.
+
+      - name: attempted_at
+        description: UTC timestamp when the PSP processed the attempt.
+        data_tests:
+          - not_null
+
+      - name: currency
+        description: ISO 4217 payment transaction currency.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - EUR
+                  - USD
+                  - GBP
+                  - PLN
+                  - SEK
+
+      - name: attempt_amount
+        description: >
+          Payment attempt amount in major units of the transaction
+          currency.
+
+      - name: payment_method
+        description: Normalized PSP payment method type.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - CARD
+                  - PAYPAL
+                  - APPLE_PAY
+                  - GOOGLE_PAY
+
+      - name: payment_status
+        description: PSP payment attempt status.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - SUCCEEDED
+                  - DECLINED
+                  - CANCELLED
+
+  - name: stg_psp__financial_events
+    description: >
+      Cleaned PSP monetary events. One row per CAPTURE, REFUND, or
+      CHARGEBACK. Source event amounts remain available as positive
+      major-unit amounts and a canonical signed amount is derived for
+      downstream finance calculations.
+    columns:
+      - name: financial_event_id
+        description: PSP monetary event identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: event_type
+        description: PSP monetary event type.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - CAPTURE
+                  - REFUND
+                  - CHARGEBACK
+
+      - name: event_at
+        description: UTC timestamp when the PSP monetary event occurred.
+        data_tests:
+          - not_null
+
+      - name: event_date
+        description: Business date derived from the PSP event timestamp.
+
+      - name: currency
+        description: ISO 4217 transaction currency.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - EUR
+                  - USD
+                  - GBP
+                  - PLN
+                  - SEK
+
+      - name: event_amount
+        description: >
+          Positive source event amount in major units of the transaction
+          currency.
+
+      - name: signed_event_amount
+        description: >
+          Canonical transaction-currency amount: positive for CAPTURE
+          and negative for REFUND and CHARGEBACK.
+
+  - name: stg_psp__settlements
+    description: >
+      Cleaned PSP payout batches. One row per settlement. Settlement
+      monetary amounts are expressed in major settlement-currency units.
+      No comparison with settlement items or bank transactions is
+      performed in staging.
+    columns:
+      - name: settlement_id
+        description: PSP settlement batch identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: settlement_date
+        description: PSP settlement business date.
+        data_tests:
+          - not_null
+
+      - name: settlement_currency
+        description: PSP payout currency.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - EUR
+
+      - name: settlement_status
+        description: PSP payout batch status.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - PENDING
+                  - PAID
+                  - FAILED
+
+      - name: bank_reference
+        description: PSP payout reference expected on the bank statement.
+
+  - name: stg_psp__settlement_items
+    description: >
+      Cleaned PSP settlement-level financial event details. One row per
+      settlement item. PSP settlement FX is preserved as EUR per one
+      transaction-currency unit.
+    columns:
+      - name: settlement_item_id
+        description: PSP settlement item identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: settlement_id
+        description: PSP settlement batch identifier.
+
+      - name: financial_event_id
+        description: PSP financial event included in the settlement.
+
+      - name: transaction_currency
+        description: Original financial event transaction currency.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - EUR
+                  - USD
+                  - GBP
+                  - PLN
+                  - SEK
+
+      - name: transaction_amount
+        description: >
+          Positive source financial-event amount in major units of the
+          original transaction currency.
+
+      - name: settlement_gross_eur_amount
+        description: >
+          Signed gross settlement value in EUR. Captures are positive;
+          refunds and chargebacks reduce settlement value.
+
+      - name: fee_eur_amount
+        description: PSP fee amount in EUR.
+
+      - name: settlement_net_eur_amount
+        description: Signed net contribution of the settlement item in EUR.
+
+      - name: psp_fx_rate
+        description: >
+          PSP settlement FX rate expressed as EUR per one unit of the
+          transaction currency.
