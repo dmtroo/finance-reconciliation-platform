@@ -16,6 +16,7 @@ dependencies = [
   "requests>=2.32,<3",
   "typer>=0.15,<1",
   "jsonschema>=4.23,<5",
+  "python-dotenv>=1,<2",
 ]
 
 
@@ -46,4 +47,4 @@ target-version = "py311"
 
 
 [project.scripts]
-finance-recon = "finance_reconciliation.generator.cli:main"
+finance-recon = "finance_reconciliation.cli:main"

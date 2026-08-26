@@ -46,3 +46,26 @@ def test_weekend_uses_previous_available_rate() -> None:
 
     assert saturday == friday
     assert sunday == friday
+
+
+def test_new_year_uses_previous_available_rate() -> None:
+    config = load_config()
+
+    provider = ReferenceFxProvider.from_csv(
+        config.fx_reference_path
+    )
+
+    new_year = provider.get_rate(
+        "USD",
+        date(2026, 1, 1),
+    )
+
+    previous_available = provider.get_rate(
+        "USD",
+        date(2025, 12, 31),
+    )
+
+    assert (
+        new_year
+        == previous_available
+    )
