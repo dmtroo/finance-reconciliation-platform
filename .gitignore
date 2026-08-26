@@ -1,0 +1,25 @@
+# Local environment
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Generated data
+data/generated/*
+!data/generated/.gitkeep
+
+# dbt local/runtime artifacts
+dbt/profiles.yml
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Local Postgres / misc
+*.log

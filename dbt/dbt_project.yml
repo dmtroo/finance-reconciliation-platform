@@ -1,0 +1,30 @@
+name: finance_reconciliation
+version: 1.0.0
+config-version: 2
+
+profile: finance_reconciliation
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+snapshot-paths: ["snapshots"]
+analysis-paths: ["analyses"]
+
+target-path: target
+
+clean-targets:
+  - target
+  - dbt_packages
+
+models:
+  finance_reconciliation:
+
+    staging:
+      +materialized: view
+
+    intermediate:
+      +materialized: view
+
+    marts:
+      +materialized: table
