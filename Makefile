@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+.PHONY: load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -47,3 +47,7 @@ test:
 
 lint:
 	ruff check src tests scripts
+
+load-run:
+	@test -n "$(RUN_DIR)" || (echo "Usage: make load-run RUN_DIR=<path>" && exit 1)
+	finance-recon load --run-dir "$(RUN_DIR)"

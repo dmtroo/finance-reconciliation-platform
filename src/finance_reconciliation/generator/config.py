@@ -9,7 +9,10 @@ from typing import Any
 import jsonschema
 import yaml
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from finance_reconciliation.paths import (
+    PROJECT_ROOT,
+    resolve_project_path,
+)
 
 
 @dataclass(frozen=True)
@@ -63,18 +66,7 @@ class GeneratorConfig:
     @property
     def fx_reference_path(self) -> Path:
         return resolve_project_path(self.data["fx_reference"]["path"])
-
-
-def resolve_project_path(value: str | Path) -> Path:
-    """Resolve a repository-relative path without depending on current shell directory."""
-
-    path = Path(value)
-
-    if path.is_absolute():
-        return path
-
-    return PROJECT_ROOT / path
-
+    
 
 def _load_yaml(path: Path) -> dict[str, Any]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))

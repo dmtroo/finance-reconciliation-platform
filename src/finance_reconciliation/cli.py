@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
-from finance_reconciliation.generator.config import load_config
+from finance_reconciliation.generator.config import (
+    load_config,
+)
 from finance_reconciliation.generator.manifest import (
     write_effective_config,
     write_manifest,
@@ -12,15 +16,16 @@ from finance_reconciliation.generator.pipeline import (
     generate_clean_dataset,
     write_clean_dataset,
 )
-
-app = typer.Typer(
-    help="Finance reconciliation synthetic source generator."
+from finance_reconciliation.ingestion.loader import (
+    load_run_directory,
 )
 
-
-@app.callback()
-def callback() -> None:
-    """Synthetic source generator CLI."""
+app = typer.Typer(
+    help=(
+        "Finance reconciliation platform "
+        "local development CLI."
+    )
+)
 
 
 @app.command()
@@ -29,9 +34,13 @@ def generate(
         Path,
         typer.Option(
             "--config",
-            help="Generator configuration YAML.",
+            help=(
+                "Generator configuration YAML."
+            ),
         ),
-    ] = Path("generator/config.example.yml"),
+    ] = Path(
+        "generator/config.example.yml"
+    ),
 ) -> None:
     config = load_config(
         config_path
@@ -66,6 +75,32 @@ def generate(
     for table, count in counts.items():
         typer.echo(
             f"{table}: {count:,} rows"
+        )
+
+
+@app.command("load")
+def load_generated_run(
+    run_dir: Annotated[
+        Path,
+        typer.Option(
+            "--run-dir",
+            help=(
+                "Generated source run directory."
+            ),
+        ),
+    ],
+) -> None:
+    counts = load_run_directory(
+        run_dir
+    )
+
+    typer.echo(
+        f"Loaded source run: {run_dir}"
+    )
+
+    for table, count in counts.items():
+        typer.echo(
+            f"{table}: {count:,} source rows"
         )
 
 
