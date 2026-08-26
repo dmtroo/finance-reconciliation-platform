@@ -1,0 +1,73 @@
+version: 2
+
+sources:
+  - name: accounting
+    description: >
+      Simplified accounting journal source used to validate that expected finance postings exist
+      and balance. This project models only the payment/settlement-related subset of the ledger.
+    database: "{{ env_var('POSTGRES_DB', 'finance_reconciliation') }}"
+    schema: raw_accounting
+    loader: synthetic_python_generator
+    config:
+      loaded_at_field: _loaded_at
+      freshness:
+        warn_after: {count: 26, period: hour}
+        error_after: {count: 48, period: hour}
+    tables:
+      - name: journal_lines
+        description: One debit or credit line belonging to an accounting journal entry.
+        columns:
+          - name: journal_line_id
+            description: Stable source primary key for the journal line.
+            data_tests: [unique, not_null]
+          - name: journal_entry_id
+            description: Identifier grouping lines into one balanced journal entry.
+            data_tests: [not_null]
+          - name: posting_date
+            description: Accounting business date on which the journal is posted.
+            data_tests: [not_null]
+          - name: account_code
+            description: Simplified chart-of-accounts code used by the portfolio model.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['1100', '1200', '4000', '6100', '6200', '6300']
+          - name: account_name
+            description: Human-readable account name supplied by the accounting source.
+            data_tests: [not_null]
+          - name: debit_eur_minor
+            description: Debit amount in EUR minor units; zero for a credit-only line.
+            data_tests: [not_null]
+          - name: credit_eur_minor
+            description: Credit amount in EUR minor units; zero for a debit-only line.
+            data_tests: [not_null]
+          - name: source_system
+            description: Upstream system responsible for the accounting event.
+            data_tests: [not_null]
+          - name: source_reference_type
+            description: Type of business object referenced by source_reference.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [FINANCIAL_EVENT, SETTLEMENT]
+          - name: source_reference
+            description: Financial event or settlement identifier that caused the posting.
+            data_tests: [not_null]
+          - name: journal_status
+            description: Journal lifecycle status; reconciliation only consumes POSTED journals.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [POSTED, DRAFT, REVERSED]
+          - name: created_at
+            description: UTC timestamp when the journal line was created in the source.
+            data_tests: [not_null]
+          - name: _loaded_at
+            description: UTC timestamp when ingestion loaded the row.
+            data_tests: [not_null]
+          - name: _batch_id
+            description: Identifier of the ingestion batch.
+            data_tests: [not_null]

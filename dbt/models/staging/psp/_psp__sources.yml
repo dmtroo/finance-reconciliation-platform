@@ -1,0 +1,196 @@
+version: 2
+
+sources:
+  - name: psp
+    description: >
+      Payment service provider source for attempts, monetary events, settlement batches, and
+      settlement line items. PSP data is authoritative for payment success, refunds,
+      chargebacks, provider fees, and actual settlement FX.
+    database: "{{ env_var('POSTGRES_DB', 'finance_reconciliation') }}"
+    schema: raw_psp
+    loader: synthetic_python_generator
+    config:
+      loaded_at_field: _loaded_at
+      freshness:
+        warn_after: {count: 6, period: hour}
+        error_after: {count: 12, period: hour}
+    tables:
+      - name: payment_attempts
+        description: One row per attempt to collect an invoice through the payment provider.
+        columns:
+          - name: payment_attempt_id
+            description: Stable source primary key for the payment attempt.
+            data_tests: [unique, not_null]
+          - name: invoice_id
+            description: Billing invoice the attempt is trying to collect.
+            data_tests: [not_null]
+          - name: provider_customer_id
+            description: PSP-specific pseudonymous customer identifier.
+            data_tests: [not_null]
+          - name: attempted_at
+            description: UTC timestamp when the PSP attempted the payment.
+            data_tests: [not_null]
+          - name: currency
+            description: ISO 4217 transaction currency.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [EUR, USD, GBP, PLN, SEK]
+          - name: amount_minor
+            description: Attempt amount in minor currency units.
+            data_tests: [not_null]
+          - name: payment_method_type
+            description: Coarse payment method category; no card or wallet credentials are stored.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [CARD, PAYPAL, APPLE_PAY, GOOGLE_PAY]
+          - name: status
+            description: Outcome of the payment attempt.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [SUCCEEDED, DECLINED, CANCELLED]
+          - name: failure_code
+            description: Failure reason for declined attempts; null for successful attempts.
+          - name: provider_transaction_id
+            description: Provider transaction reference when one exists.
+          - name: _loaded_at
+            description: UTC timestamp when ingestion loaded the row.
+            data_tests: [not_null]
+          - name: _batch_id
+            description: Identifier of the ingestion batch.
+            data_tests: [not_null]
+
+      - name: financial_events
+        description: >
+          One row per monetary PSP event. Amounts are unsigned in RAW; staging applies the
+          canonical sign convention of positive captures and negative refunds/chargebacks.
+        columns:
+          - name: financial_event_id
+            description: Stable source primary key for the monetary event.
+            data_tests: [unique, not_null]
+          - name: event_type
+            description: Monetary event category.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [CAPTURE, REFUND, CHARGEBACK]
+          - name: payment_attempt_id
+            description: Successful attempt that produced a CAPTURE; null for later refund/chargeback events.
+          - name: invoice_id
+            description: Billing invoice associated with the event.
+            data_tests: [not_null]
+          - name: original_capture_id
+            description: Parent CAPTURE event for REFUND or CHARGEBACK; null for CAPTURE events.
+          - name: event_at
+            description: UTC timestamp when the monetary event occurred.
+            data_tests: [not_null]
+          - name: currency
+            description: ISO 4217 event currency.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [EUR, USD, GBP, PLN, SEK]
+          - name: amount_minor
+            description: Positive source amount in minor units; sign is added in staging.
+            data_tests: [not_null]
+          - name: provider_transaction_id
+            description: PSP event/transaction reference.
+            data_tests: [not_null]
+          - name: _loaded_at
+            description: UTC timestamp when ingestion loaded the row.
+            data_tests: [not_null]
+          - name: _batch_id
+            description: Identifier of the ingestion batch.
+            data_tests: [not_null]
+
+      - name: settlements
+        description: One row per PSP payout batch; all v1 settlement payouts are denominated in EUR.
+        columns:
+          - name: settlement_id
+            description: Stable source primary key for the settlement batch.
+            data_tests: [unique, not_null]
+          - name: settlement_date
+            description: PSP business date assigned to the payout batch.
+            data_tests: [not_null]
+          - name: settlement_currency
+            description: Currency of the PSP payout; fixed to EUR in v1.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [EUR]
+          - name: gross_amount_minor
+            description: Signed aggregate gross amount of the settlement in EUR minor units.
+            data_tests: [not_null]
+          - name: fee_amount_minor
+            description: Aggregate non-negative PSP fees in EUR minor units.
+            data_tests: [not_null]
+          - name: net_payout_minor
+            description: Net payout in EUR minor units after fees.
+            data_tests: [not_null]
+          - name: status
+            description: PSP settlement lifecycle status.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [PENDING, PAID, FAILED]
+          - name: bank_reference
+            description: Reference sent with the payout and used for deterministic bank matching.
+          - name: created_at
+            description: UTC timestamp when the PSP created the settlement batch.
+            data_tests: [not_null]
+          - name: _loaded_at
+            description: UTC timestamp when ingestion loaded the row.
+            data_tests: [not_null]
+          - name: _batch_id
+            description: Identifier of the ingestion batch.
+            data_tests: [not_null]
+
+      - name: settlement_items
+        description: One row mapping a monetary PSP event into a settlement batch.
+        columns:
+          - name: settlement_item_id
+            description: Stable source primary key for the settlement item.
+            data_tests: [unique, not_null]
+          - name: settlement_id
+            description: Settlement batch that contains the event.
+            data_tests: [not_null]
+          - name: financial_event_id
+            description: Monetary event represented by the settlement item; logically settled at most once.
+            data_tests: [unique, not_null]
+          - name: transaction_currency
+            description: Original transaction currency.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [EUR, USD, GBP, PLN, SEK]
+          - name: transaction_amount_minor
+            description: Positive original event amount in transaction-currency minor units.
+            data_tests: [not_null]
+          - name: settlement_gross_eur_minor
+            description: Signed gross EUR value applied by the PSP for this item.
+            data_tests: [not_null]
+          - name: fee_eur_minor
+            description: Non-negative PSP fee allocated to this item in EUR minor units.
+            data_tests: [not_null]
+          - name: settlement_net_eur_minor
+            description: Signed net EUR contribution after allocated fee.
+            data_tests: [not_null]
+          - name: psp_fx_rate
+            description: EUR per one unit of transaction currency as applied by the PSP.
+            data_tests: [not_null]
+          - name: _loaded_at
+            description: UTC timestamp when ingestion loaded the row.
+            data_tests: [not_null]
+          - name: _batch_id
+            description: Identifier of the ingestion batch.
+            data_tests: [not_null]

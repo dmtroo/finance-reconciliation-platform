@@ -1,0 +1,64 @@
+version: 2
+
+sources:
+  - name: bank
+    description: >
+      Bank statement source. Bank data is authoritative for actual cash received; PSP settlement
+      payouts are matched through payment_reference rather than by amount/date heuristics.
+    database: "{{ env_var('POSTGRES_DB', 'finance_reconciliation') }}"
+    schema: raw_bank
+    loader: synthetic_python_generator
+    config:
+      loaded_at_field: _loaded_at
+      freshness:
+        warn_after: {count: 26, period: hour}
+        error_after: {count: 48, period: hour}
+    tables:
+      - name: statement_transactions
+        description: One row per bank statement transaction.
+        columns:
+          - name: bank_transaction_id
+            description: Stable source primary key for the bank transaction.
+            data_tests: [unique, not_null]
+          - name: booking_date
+            description: Date the bank booked the transaction.
+            data_tests: [not_null]
+          - name: value_date
+            description: Bank value date of the transaction.
+            data_tests: [not_null]
+          - name: direction
+            description: Cash-flow direction from the company's bank-account perspective.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [CREDIT, DEBIT]
+          - name: currency
+            description: ISO 4217 bank transaction currency.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [EUR, USD, GBP, PLN, SEK]
+          - name: amount_minor
+            description: Unsigned bank transaction amount in minor currency units.
+            data_tests: [not_null]
+          - name: counterparty
+            description: Counterparty label from the bank statement.
+            data_tests: [not_null]
+          - name: payment_reference
+            description: External payment reference used for deterministic reconciliation.
+            data_tests: [not_null]
+          - name: status
+            description: Bank transaction status.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [BOOKED, PENDING]
+          - name: _loaded_at
+            description: UTC timestamp when ingestion loaded the row.
+            data_tests: [not_null]
+          - name: _batch_id
+            description: Identifier of the ingestion batch.
+            data_tests: [not_null]

@@ -1,0 +1,44 @@
+version: 2
+
+sources:
+  - name: ecb
+    description: >
+      European Central Bank reference FX rates used only for standardized EUR management
+      reporting and FX controls. They are not used to force exact agreement with PSP settlement FX.
+    database: "{{ env_var('POSTGRES_DB', 'finance_reconciliation') }}"
+    schema: raw_ecb
+    loader: ecb_api_extractor
+    config:
+      loaded_at_field: _loaded_at
+      freshness:
+        warn_after: {count: 72, period: hour}
+        error_after: {count: 120, period: hour}
+    tables:
+      - name: fx_rates
+        description: >
+          One official ECB observation per available business date and currency. Raw orientation
+          is units of foreign currency per 1 EUR; EUR=1 is added later in staging.
+        data_tests:
+          - unique_combination:
+              arguments:
+                columns: [rate_date, currency]
+        columns:
+          - name: rate_date
+            description: ECB business date for the reference rate.
+            data_tests: [not_null]
+          - name: currency
+            description: ISO 4217 foreign currency quoted against EUR.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [USD, GBP, PLN, SEK]
+          - name: units_per_eur
+            description: Number of currency units per 1 EUR, preserving the ECB source orientation.
+            data_tests: [not_null]
+          - name: _loaded_at
+            description: UTC timestamp when the ECB extractor loaded this observation.
+            data_tests: [not_null]
+          - name: _batch_id
+            description: Identifier of the ECB ingestion batch.
+            data_tests: [not_null]

@@ -1,0 +1,160 @@
+version: 2
+
+sources:
+  - name: billing
+    description: >
+      Source-of-truth billing system for product configuration, subscriptions, and issued
+      invoices. RAW tables retain source values; business reconciliation happens downstream.
+    database: "{{ env_var('POSTGRES_DB', 'finance_reconciliation') }}"
+    schema: raw_billing
+    loader: synthetic_python_generator
+    config:
+      loaded_at_field: _loaded_at
+      freshness:
+        warn_after: {count: 26, period: hour}
+        error_after: {count: 48, period: hour}
+    tables:
+      - name: products
+        description: One row per sellable product or pricing plan in the billing system.
+        columns:
+          - name: product_id
+            description: Stable source primary key for the product or pricing plan.
+            data_tests: [unique, not_null]
+          - name: product_name
+            description: Human-readable plan name.
+            data_tests: [not_null]
+          - name: product_family
+            description: Logical product family used for finance reporting.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [CORE_SECURITY, PRIVACY, IDENTITY, CONNECTIVITY]
+          - name: billing_interval
+            description: Billing cadence for the plan.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [MONTH, YEAR]
+          - name: list_price_minor
+            description: List price in the smallest currency unit; for example 8999 means 89.99.
+            data_tests: [not_null]
+          - name: currency
+            description: ISO 4217 plan currency.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [EUR, USD, GBP, PLN, SEK]
+          - name: is_active
+            description: Whether the plan is currently available for new sales.
+            data_tests: [not_null]
+          - name: created_at
+            description: UTC timestamp when the source record was created.
+            data_tests: [not_null]
+          - name: updated_at
+            description: UTC timestamp of the latest source-side update.
+            data_tests: [not_null]
+          - name: _loaded_at
+            description: UTC timestamp when ingestion most recently observed and loaded this row.
+            data_tests: [not_null]
+          - name: _batch_id
+            description: Identifier of the ingestion batch that most recently loaded this row.
+            data_tests: [not_null]
+
+      - name: subscriptions
+        description: One row per customer subscription; contains pseudonymous customer IDs only.
+        columns:
+          - name: subscription_id
+            description: Stable source primary key for the subscription.
+            data_tests: [unique, not_null]
+          - name: customer_id
+            description: Pseudonymous customer identifier; no customer PII is stored in this project.
+            data_tests: [not_null]
+          - name: product_id
+            description: Product currently associated with the subscription.
+            data_tests: [not_null]
+          - name: subscription_status
+            description: Current lifecycle status of the subscription.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [ACTIVE, PAST_DUE, CANCELLED]
+          - name: started_at
+            description: UTC timestamp when the subscription started.
+            data_tests: [not_null]
+          - name: cancelled_at
+            description: UTC cancellation timestamp; expected only for cancelled subscriptions.
+          - name: created_at
+            description: UTC timestamp when the source record was created.
+            data_tests: [not_null]
+          - name: updated_at
+            description: UTC timestamp of the latest source-side update.
+            data_tests: [not_null]
+          - name: _loaded_at
+            description: UTC timestamp when ingestion most recently observed and loaded this row.
+            data_tests: [not_null]
+          - name: _batch_id
+            description: Identifier of the ingestion batch that most recently loaded this row.
+            data_tests: [not_null]
+
+      - name: invoices
+        description: >
+          One row per issued invoice. Billing is authoritative for invoice amount, currency,
+          product attribution, and invoice status.
+        columns:
+          - name: invoice_id
+            description: Stable source primary key for the invoice.
+            data_tests: [unique, not_null]
+          - name: subscription_id
+            description: Subscription that produced the invoice.
+            data_tests: [not_null]
+          - name: customer_id
+            description: Pseudonymous customer identifier copied from the billing context.
+            data_tests: [not_null]
+          - name: product_id
+            description: Product attributed by Billing; downstream controls detect unmapped products.
+            data_tests: [not_null]
+          - name: invoice_date
+            description: Business date on which the invoice was issued.
+            data_tests: [not_null]
+          - name: due_date
+            description: Business date on which payment is due.
+            data_tests: [not_null]
+          - name: currency
+            description: ISO 4217 invoice currency.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [EUR, USD, GBP, PLN, SEK]
+          - name: subtotal_minor
+            description: Pre-tax invoice subtotal in minor currency units.
+            data_tests: [not_null]
+          - name: tax_minor
+            description: Tax amount in minor currency units.
+            data_tests: [not_null]
+          - name: total_minor
+            description: Invoice total in minor currency units.
+            data_tests: [not_null]
+          - name: invoice_status
+            description: Current billing status of the invoice.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [OPEN, PAID, VOID, UNCOLLECTIBLE]
+          - name: created_at
+            description: UTC timestamp when the invoice record was created.
+            data_tests: [not_null]
+          - name: updated_at
+            description: UTC timestamp of the latest source-side update.
+            data_tests: [not_null]
+          - name: _loaded_at
+            description: UTC timestamp when ingestion most recently observed and loaded this row.
+            data_tests: [not_null]
+          - name: _batch_id
+            description: Identifier of the ingestion batch that most recently loaded this row.
+            data_tests: [not_null]
