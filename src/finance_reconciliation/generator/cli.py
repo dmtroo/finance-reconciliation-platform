@@ -4,6 +4,10 @@ from typing import Annotated
 import typer
 
 from finance_reconciliation.generator.config import load_config
+from finance_reconciliation.generator.manifest import (
+    write_effective_config,
+    write_manifest,
+)
 from finance_reconciliation.generator.pipeline import (
     generate_clean_dataset,
     write_clean_dataset,
@@ -40,6 +44,15 @@ def generate(
     counts = write_clean_dataset(
         config=config,
         dataset=dataset,
+    )
+
+    write_effective_config(
+        config
+    )
+
+    write_manifest(
+        config=config,
+        row_counts=counts,
     )
 
     typer.echo(

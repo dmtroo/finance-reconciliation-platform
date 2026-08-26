@@ -289,7 +289,7 @@ def _generate_post_capture_events(
                 + timedelta(days=delay)
             )
 
-            if refund_date <= config.as_of_date:
+            if refund_date <= config.end_date:
                 fraction = Decimal(
                     rng.weighted_choice(
                         refund_config[
@@ -368,7 +368,7 @@ def _generate_post_capture_events(
             + timedelta(days=delay)
         )
 
-        if chargeback_date > config.as_of_date:
+        if chargeback_date > config.end_date:
             continue
 
         event_id = ids.next(
