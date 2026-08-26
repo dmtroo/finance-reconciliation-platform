@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+.PHONY: help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -12,6 +12,8 @@ help:
 	@echo "  dbt-debug              Validate dbt connection"
 	@echo "  dbt-source-freshness   Run source freshness checks"
 	@echo "  dbt-test-sources       Run dbt data tests only on sources"
+	@echo "  test                    Run Python tests"
+	@echo "  lint                    Run Python lint checks"
 
 validate-contract:
 	python scripts/validate_contract.py
@@ -39,3 +41,9 @@ dbt-source-freshness:
 
 dbt-test-sources:
 	cd dbt && DBT_PROFILES_DIR=. dbt test --select "source:*"
+
+test:
+	pytest
+
+lint:
+	ruff check src tests scripts
