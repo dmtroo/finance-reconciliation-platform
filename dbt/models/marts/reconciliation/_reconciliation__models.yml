@@ -394,3 +394,148 @@ models:
         description: >
           Finance model or control context from which the exception was
           derived.
+
+  - name: mart_finance_daily
+    description: >
+      Daily Finance reporting mart at business-date, product, and
+      currency grain. The mart combines invoice activity, payment
+      lifecycle values, capture-level reconciliation status, and
+      reconciliation exception metrics. Settlement-level exceptions
+      without a defensible product allocation are retained with a null
+      product identifier.
+
+    columns:
+      - name: business_date
+        description: Finance business date for the aggregated activity.
+        data_tests:
+          - not_null
+
+      - name: product_id
+        description: >
+          Billing product identifier when activity can be attributed to
+          a product. Null for unallocated settlement-level activity.
+
+      - name: product_name
+        description: Product name when product_id resolves.
+
+      - name: product_family
+        description: Product family when product_id resolves.
+
+      - name: currency
+        description: Transaction or settlement currency for the daily row.
+        data_tests:
+          - not_null
+
+      - name: invoice_count
+        description: Number of Billing invoices issued on the business date.
+
+      - name: invoice_total_amount
+        description: >
+          Total Billing invoice amount in the row currency.
+
+      - name: capture_count
+        description: Number of successful PSP captures on the business date.
+
+      - name: capture_amount
+        description: Total captured amount in the row currency.
+
+      - name: valued_capture_amount_eur
+        description: >
+          Total capture amount with an available management-EUR
+          valuation.
+
+      - name: unvalued_capture_count
+        description: >
+          Number of captures for which management-EUR value cannot be
+          calculated, for example because reference FX is missing.
+
+      - name: refund_amount
+        description: Total positive refund amount in the row currency.
+
+      - name: valued_refund_amount_eur
+        description: Refund amount with available management-EUR valuation.
+
+      - name: chargeback_amount
+        description: Total positive chargeback amount in the row currency.
+
+      - name: valued_chargeback_amount_eur
+        description: Chargeback amount with available management-EUR valuation.
+
+      - name: net_payment_amount
+        description: >
+          Capture amount after refunds and chargebacks in the row
+          transaction currency.
+
+      - name: valued_net_payment_amount_eur
+        description: Net payment value with available management-EUR valuation.
+
+      - name: reconciled_capture_count
+        description: >
+          Number of captures with no active PENDING, OPEN_BREAK, or
+          EXCLUDED reconciliation exception.
+
+      - name: pending_capture_count
+        description: Number of captures whose current reconciliation status is PENDING.
+
+      - name: open_break_capture_count
+        description: Number of captures whose current reconciliation status is OPEN_BREAK.
+
+      - name: excluded_capture_count
+        description: Number of captures excluded by reconciliation policy.
+
+      - name: reconciled_capture_amount_eur
+        description: >
+          Management-EUR value of captures currently classified as
+          reconciled.
+
+      - name: pending_capture_amount_eur
+        description: Management-EUR value of captures currently pending.
+
+      - name: open_break_capture_amount_eur
+        description: Management-EUR value of captures with active breaks.
+
+      - name: excluded_capture_amount_eur
+        description: Management-EUR value of excluded captures.
+
+      - name: amount_reconciliation_rate
+        description: >
+          Reconciled management-EUR capture amount divided by total
+          management-EUR-valued capture amount. Null when the daily
+          denominator is zero.
+
+      - name: exception_count
+        description: Number of reconciliation exception rows for the daily grain.
+
+      - name: pending_exception_count
+        description: Number of PENDING reconciliation exceptions.
+
+      - name: open_break_exception_count
+        description: Number of OPEN_BREAK reconciliation exceptions.
+
+      - name: resolved_exception_count
+        description: Number of RESOLVED reconciliation exceptions.
+
+      - name: critical_exception_count
+        description: Number of CRITICAL reconciliation exceptions.
+
+      - name: warning_exception_count
+        description: Number of WARNING reconciliation exceptions.
+
+      - name: info_exception_count
+        description: Number of INFO reconciliation exceptions.
+
+      - name: gross_exception_amount_eur
+        description: >
+          Sum of exception-level EUR magnitudes. This is gross control
+          exposure and is not deduplicated across multiple exception
+          types affecting the same economic amount.
+
+      - name: open_break_exception_amount_eur
+        description: >
+          Gross EUR control exposure associated with OPEN_BREAK
+          exception rows.
+
+      - name: pending_exception_amount_eur
+        description: >
+          Gross EUR control exposure associated with PENDING exception
+          rows.
