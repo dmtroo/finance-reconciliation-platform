@@ -261,3 +261,136 @@ models:
         description: >
           True when the posted journal balance difference is within the
           configured EUR reconciliation tolerance.
+
+  - name: mart_reconciliation_exceptions
+    description: >
+      One row per reconciliation exception across invoice, PSP
+      financial-event, capture, settlement, bank, reference FX, product
+      mapping, and accounting controls. The mart converts reconciliation
+      facts into deterministic exception codes, statuses, severities,
+      and EUR exposure measures using the configured finance-control
+      policy and deterministic as-of date.
+
+    columns:
+      - name: exception_id
+        description: >
+          Deterministic exception identifier built from exception code,
+          entity type, and entity identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: exception_code
+        description: Finance reconciliation exception taxonomy code.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - MISSING_CAPTURE
+                  - CAPTURE_AMOUNT_MISMATCH
+                  - DUPLICATE_CAPTURE
+                  - INVALID_REFUND
+                  - OVER_REFUND
+                  - MISSING_SETTLEMENT
+                  - LATE_SETTLEMENT
+                  - SETTLEMENT_TOTAL_MISMATCH
+                  - MISSING_BANK_RECEIPT
+                  - BANK_AMOUNT_MISMATCH
+                  - MISSING_LEDGER_POSTING
+                  - LEDGER_AMOUNT_MISMATCH
+                  - UNBALANCED_JOURNAL
+                  - MISSING_FX_RATE
+                  - FX_RATE_OUTLIER
+                  - UNMAPPED_PRODUCT
+
+      - name: exception_status
+        description: Current reconciliation lifecycle status.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - RECONCILED
+                  - PENDING
+                  - OPEN_BREAK
+                  - RESOLVED
+                  - EXCLUDED
+
+      - name: severity
+        description: Finance-control severity.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - INFO
+                  - WARNING
+                  - CRITICAL
+
+      - name: entity_type
+        description: Grain/entity on which the exception was detected.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - INVOICE
+                  - CAPTURE
+                  - FINANCIAL_EVENT
+                  - SETTLEMENT
+
+      - name: entity_id
+        description: Identifier of the affected finance entity.
+        data_tests:
+          - not_null
+
+      - name: business_date
+        description: Business date associated with the affected entity.
+        data_tests:
+          - not_null
+
+      - name: as_of_date
+        description: >
+          Deterministic control-evaluation date used for aging-based
+          PENDING and OPEN_BREAK decisions.
+        data_tests:
+          - not_null
+
+      - name: product_id
+        description: Billing product identifier when meaningful for the exception.
+
+      - name: product_name
+        description: Product name when the Billing product resolves.
+
+      - name: product_family
+        description: Product family when the Billing product resolves.
+
+      - name: currency
+        description: Currency associated with the affected finance object.
+
+      - name: exception_amount_eur
+        description: >
+          Non-negative EUR magnitude associated with the exception when
+          it can be measured reliably. Null when EUR exposure cannot be
+          safely determined, for example because reference FX is missing.
+
+      - name: age_days
+        description: >
+          Calendar-day age or observed delay used by aging-based controls
+          when applicable.
+
+      - name: observed_amount_eur
+        description: Observed EUR amount when a single comparable value exists.
+
+      - name: expected_amount_eur
+        description: Expected EUR amount when a single comparable value exists.
+
+      - name: difference_amount_eur
+        description: >
+          Signed observed-minus-expected EUR difference when meaningful.
+
+      - name: control_source
+        description: >
+          Finance model or control context from which the exception was
+          derived.
