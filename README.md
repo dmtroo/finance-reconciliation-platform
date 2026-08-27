@@ -119,3 +119,31 @@ added as new numbered SQL files rather than editing a deployed migration in plac
 - The project optimizes for auditability and maintainability, not maximum tool count.
 
 See `docs/source-data-contract.md`, `docs/architecture.md`, and `generator/SPEC.md` for the frozen M0 design.
+
+## Local M1 acceptance
+
+The complete synthetic-source and RAW-ingestion milestone can be
+validated locally with:
+
+```bash
+make postgres-reset
+make postgres-wait
+make m1-acceptance
+```
+
+See `docs/m1-acceptance.md` for the acceptance contract and scope.
+
+## Local M2 acceptance
+
+The complete RAW-to-staging milestone can be reproduced with:
+
+```bash
+make postgres-reset
+make postgres-wait
+make m2-acceptance
+```
+
+M2 builds 10 dbt staging views and validates their grain, numeric types,
+and source-only lineage.
+
+See `docs/m2-acceptance.md` for the staging contract.
