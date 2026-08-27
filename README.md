@@ -147,3 +147,20 @@ M2 builds 10 dbt staging views and validates their grain, numeric types,
 and source-only lineage.
 
 See `docs/m2-acceptance.md` for the staging contract.
+
+## Local M3 acceptance
+
+The complete staging-to-intermediate finance milestone can be reproduced
+with:
+
+```bash
+make postgres-reset
+make postgres-wait
+make m3-acceptance
+```
+
+M3 validates as-of FX, payment lifecycle, settlement and bank matching,
+and accounting matching foundations without assigning final
+reconciliation exception codes.
+
+See `docs/m3-acceptance.md` for the intermediate-layer contract.
