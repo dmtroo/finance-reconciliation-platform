@@ -108,3 +108,156 @@ models:
         description: >
           True when the accounting journal balance difference is within
           the configured EUR reconciliation tolerance.
+
+  - name: fct_settlement_reconciliation
+    description: >
+      One row per PSP settlement combining settlement-header values,
+      aggregated settlement-item values, bank receipt context, and
+      accounting posting context. The fact applies configured finance
+      tolerances to expose settlement, bank, and ledger control outcomes
+      without expanding them into individual reconciliation exceptions.
+
+    columns:
+      - name: settlement_id
+        description: PSP settlement identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: settlement_date
+        description: PSP settlement business date.
+        data_tests:
+          - not_null
+
+      - name: settlement_currency
+        description: PSP settlement payout currency.
+
+      - name: gross_amount
+        description: PSP settlement header gross amount.
+
+      - name: fee_amount
+        description: PSP settlement header processing fee amount.
+
+      - name: net_payout_amount
+        description: PSP settlement header net payout amount.
+
+      - name: settlement_status
+        description: PSP settlement lifecycle status.
+
+      - name: settlement_item_count
+        description: Number of PSP settlement items belonging to the batch.
+
+      - name: settled_financial_event_count
+        description: Number of distinct PSP financial events in the settlement.
+
+      - name: item_gross_eur_amount
+        description: Aggregated gross EUR amount from settlement items.
+
+      - name: item_fee_eur_amount
+        description: Aggregated fee EUR amount from settlement items.
+
+      - name: item_net_eur_amount
+        description: Aggregated net EUR amount from settlement items.
+
+      - name: gross_header_minus_items_amount
+        description: >
+          PSP settlement header gross amount minus aggregated settlement
+          item gross amount.
+
+      - name: fee_header_minus_items_amount
+        description: >
+          PSP settlement header fee amount minus aggregated settlement
+          item fee amount.
+
+      - name: net_header_minus_items_amount
+        description: >
+          PSP settlement header net payout minus aggregated settlement
+          item net amount.
+
+      - name: is_settlement_total_within_tolerance
+        description: >
+          True when gross, fee, and net settlement header values all
+          agree with aggregated settlement items within the configured
+          EUR reconciliation tolerance.
+
+      - name: bank_reference_match_count
+        description: >
+          Number of bank statement rows carrying the settlement bank
+          reference.
+
+      - name: eligible_bank_receipt_count
+        description: >
+          Number of matching BOOKED EUR CREDIT bank transactions.
+
+      - name: bank_transaction_id
+        description: >
+          Bank transaction identifier when exactly one eligible receipt
+          exists.
+
+      - name: bank_amount
+        description: >
+          Booked EUR credit amount when exactly one eligible receipt
+          exists.
+
+      - name: bank_delay_days
+        description: >
+          Calendar days from PSP settlement date to matched bank booking
+          date.
+
+      - name: bank_minus_settlement_amount
+        description: >
+          Matched bank amount minus PSP net payout amount.
+
+      - name: is_bank_amount_within_tolerance
+        description: >
+          True when exactly one eligible bank receipt exists and its
+          amount agrees with the PSP net payout within the configured
+          EUR tolerance. Null when the bank match is missing or
+          ambiguous.
+
+      - name: journal_entry_match_count
+        description: >
+          Number of accounting journal entries referencing the
+          settlement.
+
+      - name: posted_journal_entry_count
+        description: >
+          Number of POSTED accounting journal entries referencing the
+          settlement.
+
+      - name: ledger_bank_debit_eur_amount
+        description: Posted debit to account 1100 BANK.
+
+      - name: ledger_fee_debit_eur_amount
+        description: Posted debit to account 6100 PAYMENT_PROCESSING_FEES.
+
+      - name: ledger_psp_clearing_credit_eur_amount
+        description: Posted credit to account 1200 PSP_CLEARING.
+
+      - name: ledger_bank_minus_expected_amount_eur
+        description: >
+          Posted BANK debit minus PSP settlement net payout.
+
+      - name: ledger_fee_minus_expected_amount_eur
+        description: >
+          Posted processing-fee debit minus PSP settlement fee.
+
+      - name: ledger_clearing_minus_expected_amount_eur
+        description: >
+          Posted PSP-clearing credit minus PSP settlement gross amount.
+
+      - name: is_ledger_amount_within_tolerance
+        description: >
+          True when the BANK, processing-fee, and PSP-clearing ledger
+          legs all agree with the PSP settlement amounts within the
+          configured EUR tolerance. Null when there is not exactly one
+          posted accounting entry.
+
+      - name: posted_journal_balance_difference_eur
+        description: >
+          Debit-minus-credit difference for the matched posted journal.
+
+      - name: is_journal_balanced_within_tolerance
+        description: >
+          True when the posted journal balance difference is within the
+          configured EUR reconciliation tolerance.
