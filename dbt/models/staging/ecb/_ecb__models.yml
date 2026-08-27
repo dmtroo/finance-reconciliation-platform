@@ -1,0 +1,69 @@
+version: 2
+
+models:
+  - name: stg_ecb__fx_rates
+    description: >
+      Cleaned ECB reference FX observations. Source-native foreign
+      currency units per EUR are preserved and inverted into the
+      canonical EUR-per-currency-unit orientation used by downstream
+      finance models. A derived EUR=1 observation is added for each ECB
+      rate date. Weekend and holiday as-of selection is intentionally
+      handled downstream.
+
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns:
+              - rate_date
+              - currency
+
+    columns:
+      - name: rate_date
+        description: Available ECB reference-rate business date.
+        data_tests:
+          - not_null
+
+      - name: currency
+        description: ISO 4217 currency represented by the FX observation.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - EUR
+                  - USD
+                  - GBP
+                  - PLN
+                  - SEK
+
+      - name: units_per_eur
+        description: >
+          Foreign currency units per one EUR. For non-EUR currencies
+          this preserves the ECB source orientation; the derived EUR
+          observation equals 1.
+
+      - name: eur_per_unit
+        description: >
+          Canonical FX orientation used by downstream finance models:
+          EUR per one unit of the represented currency.
+
+      - name: is_derived_rate
+        description: >
+          True only for the synthetic EUR=1 observation added in staging.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - true
+                  - false
+
+      - name: _loaded_at
+        description: >
+          Source ingestion timestamp. Derived EUR rows inherit the latest
+          ECB load timestamp for the same rate date.
+
+      - name: _batch_id
+        description: >
+          ECB ingestion batch identifier. Derived EUR rows inherit batch
+          lineage from the same ECB rate date.

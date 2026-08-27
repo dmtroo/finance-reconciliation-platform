@@ -1,0 +1,137 @@
+version: 2
+
+models:
+  - name: stg_billing__products
+    description: >
+      Cleaned Billing product catalog. One row per product. Monetary
+      list prices are converted from integer minor units to decimal
+      transaction-currency amounts.
+    columns:
+      - name: product_id
+        description: Billing product identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: product_family
+        description: High-level commercial product family.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - CORE_SECURITY
+                  - PRIVACY
+                  - IDENTITY
+                  - CONNECTIVITY
+
+      - name: billing_interval
+        description: Product billing cadence.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - MONTH
+                  - YEAR
+
+      - name: list_price_amount
+        description: >
+          Product list price in major units of the transaction
+          currency, converted from source minor units.
+
+      - name: currency
+        description: ISO 4217 transaction currency.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - EUR
+                  - USD
+                  - GBP
+                  - PLN
+                  - SEK
+
+  - name: stg_billing__subscriptions
+    description: >
+      Cleaned Billing subscription records. One row per subscription.
+      No product enrichment or cross-entity lifecycle logic is applied
+      in staging.
+    columns:
+      - name: subscription_id
+        description: Billing subscription identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: customer_id
+        description: Pseudonymous customer identifier.
+
+      - name: product_id
+        description: Product identifier reported by Billing.
+
+      - name: subscription_status
+        description: Current Billing subscription status.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - ACTIVE
+                  - PAST_DUE
+                  - CANCELLED
+
+  - name: stg_billing__invoices
+    description: >
+      Cleaned Billing invoices. One row per invoice. Source monetary
+      values are converted from integer minor units to decimal amounts
+      while preserving the original transaction currency.
+    columns:
+      - name: invoice_id
+        description: Billing invoice identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: subscription_id
+        description: Subscription identifier reported on the invoice.
+
+      - name: customer_id
+        description: Pseudonymous customer identifier.
+
+      - name: product_id
+        description: Product identifier reported on the invoice.
+
+      - name: invoice_date
+        description: Billing business date when the invoice was issued.
+        data_tests:
+          - not_null
+
+      - name: currency
+        description: Invoice transaction currency.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - EUR
+                  - USD
+                  - GBP
+                  - PLN
+                  - SEK
+
+      - name: subtotal_amount
+        description: Invoice subtotal in major transaction-currency units.
+
+      - name: tax_amount
+        description: Invoice tax in major transaction-currency units.
+
+      - name: total_amount
+        description: Invoice total in major transaction-currency units.
+
+      - name: invoice_status
+        description: Billing invoice status.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - OPEN
+                  - PAID
+                  - VOID
+                  - UNCOLLECTIBLE

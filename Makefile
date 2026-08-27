@@ -8,7 +8,7 @@ M1_RUN_DIR ?= data/generated/SYN-42-2026-01-01-2026-01-31-clean
 M1_ECB_RAW ?= data/external/ecb/m1_raw_fixture.csv
 M1_ECB_REFERENCE ?= data/external/ecb/m1_reference_fixture.csv
 
-.PHONY: m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+.PHONY: m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -22,6 +22,9 @@ help:
 	@echo "  dbt-test-sources       Run dbt data tests only on sources"
 	@echo "  test                    Run Python tests"
 	@echo "  lint                    Run Python lint checks"
+	@echo "  dbt-build-staging       Build and test all dbt staging models"
+	@echo "  m2-validate             Validate the M2 staging contract"
+	@echo "  m2-acceptance           Run the complete M2 acceptance workflow"
 
 validate-contract:
 	python scripts/validate_contract.py
@@ -93,3 +96,14 @@ m1-acceptance:
 	$(MAKE) m1-validate
 	$(MAKE) dbt-test-sources
 	$(MAKE) dbt-source-freshness
+
+dbt-build-staging:
+	cd dbt && DBT_PROFILES_DIR=. dbt build --select "path:models/staging"
+
+m2-validate:
+	python scripts/validate_m2.py
+
+m2-acceptance:
+	$(MAKE) m1-acceptance
+	$(MAKE) dbt-build-staging
+	$(MAKE) m2-validate
