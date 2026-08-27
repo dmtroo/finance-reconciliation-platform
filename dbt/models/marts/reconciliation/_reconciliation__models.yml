@@ -1,0 +1,110 @@
+version: 2
+
+models:
+  - name: fct_payment_reconciliation
+    description: >
+      One row per successful PSP capture combining Billing invoice,
+      product, PSP lifecycle, settlement, reference FX, and accounting
+      context. The fact exposes reconciliation control outcomes and
+      differences without expanding them into individual exception rows.
+
+    columns:
+      - name: capture_id
+        description: PSP CAPTURE financial event identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: invoice_id
+        description: Billing invoice associated with the capture.
+        data_tests:
+          - not_null
+
+      - name: product_id
+        description: Product identifier reported by Billing.
+
+      - name: is_product_mapped
+        description: >
+          True when the Billing product identifier resolves to the
+          product staging model.
+
+      - name: invoice_total_amount
+        description: Billing invoice total in invoice currency.
+
+      - name: capture_amount
+        description: PSP captured amount in transaction currency.
+
+      - name: capture_amount_eur
+        description: >
+          Capture value translated to management EUR using the selected
+          as-of ECB reference FX rate.
+
+      - name: invoice_capture_count
+        description: Number of PSP captures associated with the invoice.
+
+      - name: capture_currency_matches_invoice
+        description: >
+          True when Billing invoice currency and PSP capture currency
+          agree.
+
+      - name: capture_minus_invoice_amount
+        description: >
+          PSP capture amount minus Billing invoice total when currencies
+          agree.
+
+      - name: capture_amount_matches_invoice
+        description: >
+          True when Billing invoice and PSP capture currencies and
+          amounts agree.
+
+      - name: settlement_item_count
+        description: Number of PSP settlement items referencing the capture.
+
+      - name: settlement_count
+        description: Number of distinct PSP settlement batches for the capture.
+
+      - name: settlement_delay_days
+        description: >
+          Calendar days from capture date to an unambiguously matched
+          settlement date.
+
+      - name: psp_fx_rate_variance_ratio
+        description: >
+          Relative variance between PSP settlement FX and the selected
+          ECB reference FX.
+
+      - name: is_fx_rate_outlier
+        description: >
+          True when absolute PSP-vs-reference FX variance exceeds the
+          configured reconciliation FX threshold. Null when the
+          comparison cannot be performed.
+
+      - name: posted_journal_entry_count
+        description: Number of POSTED accounting entries referencing the capture.
+
+      - name: ledger_debit_minus_expected_amount_eur
+        description: >
+          Posted expected-account debit minus management-EUR capture
+          value.
+
+      - name: ledger_credit_minus_expected_amount_eur
+        description: >
+          Posted expected-account credit minus management-EUR capture
+          value.
+
+      - name: is_ledger_amount_within_tolerance
+        description: >
+          True when both expected accounting legs are within the
+          configured EUR reconciliation tolerance. Null when there is
+          not exactly one posted journal entry or reference FX is
+          unavailable.
+
+      - name: posted_journal_balance_difference_eur
+        description: >
+          Debit-minus-credit balance difference of the posted accounting
+          entry.
+
+      - name: is_journal_balanced_within_tolerance
+        description: >
+          True when the accounting journal balance difference is within
+          the configured EUR reconciliation tolerance.
