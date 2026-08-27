@@ -164,3 +164,22 @@ and accounting matching foundations without assigning final
 reconciliation exception codes.
 
 See `docs/m3-acceptance.md` for the intermediate-layer contract.
+
+## Local M4 acceptance
+
+The complete Finance reconciliation milestone can be reproduced with:
+
+```bash
+make postgres-reset
+make postgres-wait
+make m4-acceptance
+```
+
+M4 validates the payment and settlement reconciliation facts, the
+exception mart, and the daily Finance reporting mart.
+
+For the deterministic clean scenario, the acceptance contract requires
+zero reconciliation exceptions, zero unvalued captures, and a 100%
+amount-based reconciliation rate for valued capture volume.
+
+See `docs/m4-acceptance.md` for the complete reconciliation contract.
