@@ -1,0 +1,170 @@
+version: 2
+
+models:
+  - name: int_accounting__journal_entries
+    description: >
+      One row per accounting journal entry aggregated from journal
+      lines. The model exposes debit and credit totals, important
+      account-level amounts, source-reference consistency, and the
+      debit-minus-credit balance difference without classifying
+      accounting exceptions.
+
+    columns:
+      - name: journal_entry_id
+        description: Accounting journal entry identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: journal_line_count
+        description: Number of journal lines belonging to the entry.
+
+      - name: source_reference_type
+        description: >
+          Source reference type when all lines agree on one value;
+          otherwise null.
+
+      - name: source_reference
+        description: >
+          Upstream financial event or settlement identifier when all
+          lines agree on one value; otherwise null.
+
+      - name: total_debit_eur_amount
+        description: Total debit amount in the journal entry.
+
+      - name: total_credit_eur_amount
+        description: Total credit amount in the journal entry.
+
+      - name: journal_balance_difference_eur
+        description: >
+          Total debit minus total credit. Zero represents a balanced
+          entry; exception classification is downstream.
+
+  - name: int_accounting__source_reference_summary
+    description: >
+      One row per accounting source-reference type and identifier,
+      summarizing matching journal entries and posted account amounts.
+      Multiple or missing journal entries are retained as matching facts
+      rather than classified as exceptions.
+
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns:
+              - source_reference_type
+              - source_reference
+
+    columns:
+      - name: source_reference_type
+        description: FINANCIAL_EVENT or SETTLEMENT.
+        data_tests:
+          - not_null
+
+      - name: source_reference
+        description: Referenced financial event or settlement identifier.
+        data_tests:
+          - not_null
+
+      - name: journal_entry_match_count
+        description: Number of journal entries carrying the reference.
+
+      - name: posted_journal_entry_count
+        description: Number of matching journal entries with POSTED status.
+
+      - name: posted_journal_entry_id
+        description: >
+          Journal entry identifier when exactly one posted journal entry
+          exists; otherwise null.
+
+      - name: posted_journal_balance_difference_eur
+        description: >
+          Combined debit-minus-credit difference across posted matching
+          journal entries. Null when no posted entry exists.
+
+  - name: int_financial_events__accounting_context
+    description: >
+      One row per PSP financial event enriched with accounting posting
+      context. Expected debit and credit accounts are derived from the
+      project accounting contract, and ledger-vs-expected amount
+      differences are exposed without assigning reconciliation statuses
+      or exception codes.
+
+    columns:
+      - name: financial_event_id
+        description: PSP financial event identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: journal_entry_match_count
+        description: Number of accounting journal entries referencing the event.
+
+      - name: posted_journal_entry_count
+        description: Number of POSTED journal entries referencing the event.
+
+      - name: accounting_posting_delay_days
+        description: >
+          Calendar days from the financial event date to the unique
+          posted accounting date.
+
+      - name: expected_debit_account_code
+        description: Expected debit account for the financial event type.
+
+      - name: expected_credit_account_code
+        description: Expected credit account for the financial event type.
+
+      - name: ledger_expected_debit_eur_amount
+        description: Amount posted to the expected debit account.
+
+      - name: ledger_expected_credit_eur_amount
+        description: Amount posted to the expected credit account.
+
+      - name: ledger_debit_minus_expected_amount_eur
+        description: >
+          Posted expected-account debit minus the management-EUR event
+          amount. No reconciliation tolerance is applied.
+
+      - name: ledger_credit_minus_expected_amount_eur
+        description: >
+          Posted expected-account credit minus the management-EUR event
+          amount. No reconciliation tolerance is applied.
+
+  - name: int_settlements__accounting_context
+    description: >
+      One row per PSP settlement enriched with accounting posting
+      context. Bank, processing-fee, and PSP-clearing ledger amounts are
+      compared with settlement header amounts without assigning
+      reconciliation exceptions.
+
+    columns:
+      - name: settlement_id
+        description: PSP settlement identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: posted_journal_entry_count
+        description: Number of POSTED journal entries referencing the settlement.
+
+      - name: accounting_posting_delay_days
+        description: >
+          Calendar days from settlement date to the unique posted
+          accounting date.
+
+      - name: ledger_bank_debit_eur_amount
+        description: Posted debit to account 1100 BANK.
+
+      - name: ledger_fee_debit_eur_amount
+        description: Posted debit to account 6100 PAYMENT_PROCESSING_FEES.
+
+      - name: ledger_psp_clearing_credit_eur_amount
+        description: Posted credit to account 1200 PSP_CLEARING.
+
+      - name: ledger_bank_minus_expected_amount_eur
+        description: Posted bank debit minus PSP net payout.
+
+      - name: ledger_fee_minus_expected_amount_eur
+        description: Posted fee debit minus PSP settlement fee.
+
+      - name: ledger_clearing_minus_expected_amount_eur
+        description: Posted PSP-clearing credit minus settlement gross.

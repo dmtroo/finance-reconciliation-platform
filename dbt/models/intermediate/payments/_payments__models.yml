@@ -1,0 +1,121 @@
+version: 2
+
+models:
+  - name: int_captures__lifecycle
+    description: >
+      One row per PSP CAPTURE enriched with all REFUND and CHARGEBACK
+      events that reference that capture. The model provides gross,
+      post-capture, and net payment measures in transaction currency
+      and management EUR without classifying reconciliation exceptions.
+
+    columns:
+      - name: capture_id
+        description: PSP financial event identifier for the CAPTURE.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: payment_attempt_id
+        description: Payment attempt that produced the capture.
+
+      - name: invoice_id
+        description: Billing invoice associated with the capture.
+
+      - name: capture_amount
+        description: Positive captured amount in transaction-currency major units.
+
+      - name: capture_amount_eur
+        description: >
+          Capture amount translated to management EUR using the
+          as-of ECB reference rate.
+
+      - name: refund_event_count
+        description: Number of refund events referencing this capture.
+
+      - name: refund_amount
+        description: >
+          Total positive refund amount referencing this capture in the
+          transaction currency.
+
+      - name: chargeback_event_count
+        description: Number of chargeback events referencing this capture.
+
+      - name: chargeback_amount
+        description: >
+          Total positive chargeback amount referencing this capture in
+          the transaction currency.
+
+      - name: net_capture_amount
+        description: >
+          Capture amount after applying signed refunds and chargebacks
+          in the transaction currency.
+
+      - name: net_capture_amount_eur
+        description: >
+          Management-EUR net capture amount. Null when any required
+          reference FX observation is unavailable.
+
+      - name: has_refund
+        description: True when at least one refund references the capture.
+
+      - name: has_chargeback
+        description: True when at least one chargeback references the capture.
+
+  - name: int_invoices__payment_summary
+    description: >
+      One row per Billing invoice summarizing PSP payment attempts,
+      captures, refunds, chargebacks, and net payment values. Missing
+      payment activity is retained as zero counts and amounts so
+      downstream finance controls can classify reconciliation outcomes.
+
+    columns:
+      - name: invoice_id
+        description: Billing invoice identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: payment_attempt_count
+        description: Number of PSP payment attempts associated with the invoice.
+
+      - name: successful_attempt_count
+        description: Number of PSP attempts reported as successful.
+
+      - name: declined_attempt_count
+        description: Number of PSP attempts reported as declined.
+
+      - name: capture_count
+        description: Number of PSP CAPTURE events associated with the invoice.
+
+      - name: capture_amount
+        description: Total captured amount in transaction-currency major units.
+
+      - name: refund_event_count
+        description: Number of matched refund events across invoice captures.
+
+      - name: refund_amount
+        description: Total matched refund amount across invoice captures.
+
+      - name: chargeback_event_count
+        description: Number of matched chargeback events across invoice captures.
+
+      - name: chargeback_amount
+        description: Total matched chargeback amount across invoice captures.
+
+      - name: net_payment_amount
+        description: >
+          Total capture amount after matched refunds and chargebacks.
+
+      - name: net_payment_amount_eur
+        description: >
+          Management-EUR net payment amount. Null if an included
+          financial event cannot be converted using reference FX.
+
+      - name: has_capture
+        description: True when at least one capture exists for the invoice.
+
+      - name: has_refund
+        description: True when at least one matched refund exists.
+
+      - name: has_chargeback
+        description: True when at least one matched chargeback exists.
