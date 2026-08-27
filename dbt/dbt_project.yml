@@ -28,3 +28,10 @@ models:
 
     marts:
       +materialized: table
+
+vars:
+  reconciliation_amount_tolerance_eur: 0.01
+  reconciliation_settlement_pending_days: 5
+  reconciliation_bank_pending_days: 2
+  reconciliation_fx_outlier_ratio: 0.03
+  reconciliation_as_of_date: "2026-01-31"

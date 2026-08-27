@@ -8,7 +8,7 @@ M1_RUN_DIR ?= data/generated/SYN-42-2026-01-01-2026-01-31-clean
 M1_ECB_RAW ?= data/external/ecb/m1_raw_fixture.csv
 M1_ECB_REFERENCE ?= data/external/ecb/m1_reference_fixture.csv
 
-.PHONY: m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+.PHONY: m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -28,6 +28,9 @@ help:
 	@echo "  dbt-build-intermediate  Build and test all dbt intermediate models"
 	@echo "  m3-validate             Validate the M3 intermediate finance contract"
 	@echo "  m3-acceptance           Run the complete M3 acceptance workflow"
+	@echo "  dbt-build-marts         Build and test all dbt reconciliation marts"
+	@echo "  m4-validate             Validate the M4 reconciliation mart contract"
+	@echo "  m4-acceptance           Run the complete M4 reconciliation acceptance workflow"
 
 validate-contract:
 	python scripts/validate_contract.py
@@ -101,7 +104,7 @@ m1-acceptance:
 	$(MAKE) dbt-source-freshness
 
 dbt-build-staging:
-	cd dbt && DBT_PROFILES_DIR=. dbt build --select "path:models/staging"
+	cd dbt && DBT_PROFILES_DIR=. dbt build --select "path:models/staging" --indirect-selection=buildable
 
 m2-validate:
 	python scripts/validate_m2.py
@@ -112,7 +115,7 @@ m2-acceptance:
 	$(MAKE) m2-validate
 
 dbt-build-intermediate:
-	cd dbt && DBT_PROFILES_DIR=. dbt build --select "path:models/intermediate"
+	cd dbt && DBT_PROFILES_DIR=. dbt build --select "path:models/intermediate" --indirect-selection=buildable
 
 m3-validate:
 	python scripts/validate_m3.py
@@ -121,3 +124,14 @@ m3-acceptance:
 	$(MAKE) m2-acceptance
 	$(MAKE) dbt-build-intermediate
 	$(MAKE) m3-validate
+
+dbt-build-marts:
+	cd dbt && DBT_PROFILES_DIR=. dbt build --select "path:models/marts" --indirect-selection=buildable
+
+m4-validate:
+	python scripts/validate_m4.py
+
+m4-acceptance:
+	$(MAKE) m3-acceptance
+	$(MAKE) dbt-build-marts
+	$(MAKE) m4-validate
