@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: stg_accounting__journal_lines
+    description: >
+      Cleaned accounting journal lines. One row per debit or credit
+      journal line. EUR amounts are converted from integer minor units
+      to decimal amounts. Journal balancing and expected-posting
+      controls are intentionally downstream responsibilities.
+
+    columns:
+      - name: journal_line_id
+        description: Accounting journal line identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: journal_entry_id
+        description: Identifier grouping journal lines into one entry.
+        data_tests:
+          - not_null
+
+      - name: posting_date
+        description: Accounting posting business date.
+        data_tests:
+          - not_null
+
+      - name: account_code
+        description: General ledger account code used by the project.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - "1100"
+                  - "1200"
+                  - "4000"
+                  - "6100"
+                  - "6200"
+                  - "6300"
+
+      - name: account_name
+        description: General ledger account name.
+
+      - name: debit_eur_amount
+        description: Debit amount in EUR major units.
+
+      - name: credit_eur_amount
+        description: Credit amount in EUR major units.
+
+      - name: source_system
+        description: Upstream system represented by the journal entry.
+
+      - name: source_reference_type
+        description: Type of upstream finance object represented by the entry.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - FINANCIAL_EVENT
+                  - SETTLEMENT
+
+      - name: source_reference
+        description: Identifier of the referenced financial event or settlement.
+
+      - name: journal_status
+        description: Accounting journal status.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - POSTED
+                  - DRAFT
+                  - REVERSED

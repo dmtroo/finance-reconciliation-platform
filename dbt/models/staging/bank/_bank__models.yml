@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: stg_bank__statement_transactions
+    description: >
+      Cleaned bank statement transactions. One row per bank statement
+      line. Source monetary values are converted from integer minor
+      units to decimal amounts. No PSP settlement matching is performed
+      in staging.
+
+    columns:
+      - name: bank_transaction_id
+        description: Bank statement transaction identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: booking_date
+        description: Bank booking date.
+        data_tests:
+          - not_null
+
+      - name: value_date
+        description: Bank value date.
+
+      - name: direction
+        description: Direction of the bank transaction.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - CREDIT
+                  - DEBIT
+
+      - name: currency
+        description: ISO 4217 bank transaction currency.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - EUR
+
+      - name: bank_amount
+        description: >
+          Positive bank transaction amount in major units of the
+          transaction currency. Direction is represented separately.
+
+      - name: counterparty
+        description: Counterparty reported on the bank statement.
+
+      - name: payment_reference
+        description: Payment reference reported by the bank.
+
+      - name: bank_status
+        description: Bank statement transaction status.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - BOOKED
+                  - PENDING
