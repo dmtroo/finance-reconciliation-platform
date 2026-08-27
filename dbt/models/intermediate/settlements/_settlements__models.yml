@@ -1,0 +1,131 @@
+version: 2
+
+models:
+  - name: int_financial_events__settlement_mapping
+    description: >
+      One row per PSP financial event enriched with settlement-item and
+      settlement-batch context. Events without settlement records are
+      preserved. Matching counts, settlement delay, PSP FX, and PSP-vs-
+      reference FX variance are exposed as facts without classifying
+      reconciliation exceptions.
+
+    columns:
+      - name: financial_event_id
+        description: PSP financial event identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: settlement_item_count
+        description: Number of PSP settlement items referencing the event.
+        data_tests:
+          - not_null
+
+      - name: settlement_count
+        description: Number of distinct settlement batches referencing the event.
+        data_tests:
+          - not_null
+
+      - name: settlement_id
+        description: >
+          Settlement identifier when the event maps unambiguously to
+          exactly one settlement batch; otherwise null.
+
+      - name: settlement_date
+        description: PSP settlement business date for an unambiguous match.
+
+      - name: settlement_delay_days
+        description: >
+          Calendar days between the financial event date and matched
+          PSP settlement date.
+
+      - name: settlement_gross_eur_amount
+        description: >
+          Signed gross EUR value represented by settlement items
+          associated with the financial event.
+
+      - name: settlement_fee_eur_amount
+        description: PSP settlement fee associated with the financial event.
+
+      - name: settlement_net_eur_amount
+        description: >
+          Signed net EUR contribution represented by settlement items
+          associated with the financial event.
+
+      - name: psp_fx_rate
+        description: >
+          PSP settlement FX rate expressed as EUR per one unit of
+          transaction currency when the mapping has one consistent rate.
+
+      - name: psp_fx_rate_variance_ratio
+        description: >
+          Relative difference between PSP settlement FX and the
+          as-of ECB reference FX. A value of 0.03 represents a 3%
+          positive variance. Threshold classification is downstream.
+
+  - name: int_settlements__bank_context
+    description: >
+      One row per PSP settlement combining settlement-header values,
+      aggregated settlement-item values, and bank receipt matching
+      context. Amount differences and delays are exposed as facts;
+      reconciliation statuses and exception codes are intentionally
+      downstream.
+
+    columns:
+      - name: settlement_id
+        description: PSP settlement identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: settlement_item_count
+        description: Number of settlement items included in the batch.
+
+      - name: settled_financial_event_count
+        description: Number of distinct PSP financial events in the batch.
+
+      - name: item_gross_eur_amount
+        description: Aggregated gross EUR amount from settlement items.
+
+      - name: item_fee_eur_amount
+        description: Aggregated PSP fee amount from settlement items.
+
+      - name: item_net_eur_amount
+        description: Aggregated net EUR amount from settlement items.
+
+      - name: gross_header_minus_items_amount
+        description: PSP settlement gross header minus aggregated item gross.
+
+      - name: fee_header_minus_items_amount
+        description: PSP settlement fee header minus aggregated item fees.
+
+      - name: net_header_minus_items_amount
+        description: PSP settlement net payout header minus aggregated item net.
+
+      - name: bank_reference_match_count
+        description: >
+          Number of bank statement rows carrying the PSP bank reference.
+
+      - name: eligible_bank_receipt_count
+        description: >
+          Number of matching bank rows that are BOOKED EUR CREDIT
+          transactions.
+
+      - name: bank_transaction_id
+        description: >
+          Bank transaction identifier when exactly one eligible receipt
+          exists; otherwise null.
+
+      - name: bank_amount
+        description: >
+          Booked EUR credit amount when exactly one eligible bank receipt
+          exists.
+
+      - name: bank_delay_days
+        description: >
+          Calendar days from PSP settlement date to matching bank booking date.
+
+      - name: bank_minus_settlement_amount
+        description: >
+          Matched bank amount minus PSP net payout amount. No tolerance
+          or exception classification is applied in this model.
