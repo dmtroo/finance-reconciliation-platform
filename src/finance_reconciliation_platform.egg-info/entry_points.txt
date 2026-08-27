@@ -1,0 +1,2 @@
+[console_scripts]
+finance-recon = finance_reconciliation.cli:main

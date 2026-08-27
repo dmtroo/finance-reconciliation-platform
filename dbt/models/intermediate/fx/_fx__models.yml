@@ -1,0 +1,56 @@
+version: 2
+
+models:
+  - name: int_financial_events__with_reference_fx
+    description: >
+      PSP financial events enriched with the latest available ECB
+      reference FX observation on or before the event date. One row
+      is preserved per PSP financial event. Missing reference rates
+      remain null so downstream reconciliation controls can classify
+      them rather than dropping the event.
+
+    columns:
+      - name: financial_event_id
+        description: PSP financial event identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: event_type
+        description: CAPTURE, REFUND, or CHARGEBACK.
+
+      - name: event_date
+        description: PSP financial event business date.
+        data_tests:
+          - not_null
+
+      - name: currency
+        description: Financial event transaction currency.
+        data_tests:
+          - not_null
+
+      - name: reference_fx_rate_date
+        description: >
+          Latest available ECB rate date on or before the event date.
+          Null when no eligible reference FX observation is available.
+
+      - name: reference_fx_rate
+        description: >
+          ECB reference FX expressed as EUR per one unit of the
+          financial event transaction currency.
+
+      - name: reference_fx_age_days
+        description: >
+          Calendar-day difference between the financial event date and
+          selected ECB reference-rate date. Weekend and holiday events
+          may therefore have a positive age.
+
+      - name: event_amount_eur
+        description: >
+          Positive financial-event amount translated to management EUR
+          using the selected ECB reference rate.
+
+      - name: signed_event_amount_eur
+        description: >
+          Signed management-EUR event amount: positive for CAPTURE and
+          negative for REFUND and CHARGEBACK.

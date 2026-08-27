@@ -3,6 +3,8 @@ pydantic<3,>=2.10
 PyYAML<7,>=6
 requests<3,>=2.32
 typer<1,>=0.15
+jsonschema<5,>=4.23
+python-dotenv<2,>=1
 
 [dbt]
 dbt-postgres<2,>=1.10
@@ -10,4 +12,3 @@ dbt-postgres<2,>=1.10
 [dev]
 pytest<9,>=8
 ruff<1,>=0.9
-jsonschema<5,>=4.23
