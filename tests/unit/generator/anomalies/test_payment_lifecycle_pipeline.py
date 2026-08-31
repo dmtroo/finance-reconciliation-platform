@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from finance_reconciliation.generator.anomalies.injector import (
-    inject_anomalies,
+from finance_reconciliation.generator.anomalies.payment_lifecycle import (
+    inject_payment_lifecycle_anomalies,
 )
 
 EXPECTED_CODES = [
@@ -20,14 +20,19 @@ EXPECTED_CODES = [
 def test_payment_lifecycle_injects_expected_anomalies(
     clean_lifecycle_tables,
 ) -> None:
-    result = inject_anomalies(
+    tables = deepcopy(
         clean_lifecycle_tables
+    )
+
+    anomalies = (
+        inject_payment_lifecycle_anomalies(
+            tables
+        )
     )
 
     actual_codes = [
         anomaly.anomaly_code
-        for anomaly
-        in result.anomalies
+        for anomaly in anomalies
     ]
 
     assert (
@@ -39,37 +44,29 @@ def test_payment_lifecycle_injects_expected_anomalies(
 def test_payment_lifecycle_is_deterministic(
     clean_lifecycle_tables,
 ) -> None:
-    first = inject_anomalies(
+    first_tables = deepcopy(
         clean_lifecycle_tables
     )
 
-    second = inject_anomalies(
+    second_tables = deepcopy(
         clean_lifecycle_tables
     )
+
+    first = (
+        inject_payment_lifecycle_anomalies(
+            first_tables
+        )
+    )
+
+    second = (
+        inject_payment_lifecycle_anomalies(
+            second_tables
+        )
+    )
+
+    assert first == second
 
     assert (
-        first.anomalies
-        == second.anomalies
-    )
-
-    assert (
-        first.tables
-        == second.tables
-    )
-
-
-def test_injector_does_not_mutate_clean_input(
-    clean_lifecycle_tables,
-) -> None:
-    original = deepcopy(
-        clean_lifecycle_tables
-    )
-
-    inject_anomalies(
-        clean_lifecycle_tables
-    )
-
-    assert (
-        clean_lifecycle_tables
-        == original
+        first_tables
+        == second_tables
     )

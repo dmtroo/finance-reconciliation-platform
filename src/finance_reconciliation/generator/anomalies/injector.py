@@ -9,6 +9,12 @@ from finance_reconciliation.generator.anomalies.models import (
 from finance_reconciliation.generator.anomalies.payment_lifecycle import (
     inject_payment_lifecycle_anomalies,
 )
+from finance_reconciliation.generator.anomalies.reconciliation_controls import (
+    inject_reconciliation_control_anomalies,
+)
+from finance_reconciliation.generator.anomalies.state import (
+    AnomalyInjectionState,
+)
 
 
 @dataclass
@@ -17,6 +23,7 @@ class AnomalyInjectionResult:
         str,
         list[dict[str, Any]],
     ]
+
     anomalies: list[
         AnomalyRecord
     ]
@@ -37,13 +44,19 @@ def inject_anomalies(
         in tables.items()
     }
 
-    anomalies = (
-        inject_payment_lifecycle_anomalies(
-            copied_tables
-        )
+    state = AnomalyInjectionState()
+
+    inject_payment_lifecycle_anomalies(
+        copied_tables,
+        state=state,
+    )
+
+    inject_reconciliation_control_anomalies(
+        copied_tables,
+        state=state,
     )
 
     return AnomalyInjectionResult(
         tables=copied_tables,
-        anomalies=anomalies,
+        anomalies=state.anomalies,
     )

@@ -27,16 +27,24 @@ from finance_reconciliation.generator.anomalies.payment_lifecycle.missing_settle
 from finance_reconciliation.generator.anomalies.payment_lifecycle.over_refund import (
     inject_over_refund,
 )
-from finance_reconciliation.generator.anomalies.payment_lifecycle.state import (
-    PaymentLifecycleInjectionState,
+from finance_reconciliation.generator.anomalies.state import (
+    AnomalyInjectionState,
 )
 
 
 def inject_payment_lifecycle_anomalies(
     tables: Tables,
+    *,
+    state: (
+        AnomalyInjectionState
+        | None
+    ) = None,
 ) -> list[AnomalyRecord]:
-    state = (
-        PaymentLifecycleInjectionState()
+    if state is None:
+        state = AnomalyInjectionState()
+
+    start_index = len(
+        state.anomalies
     )
 
     inject_missing_capture(
@@ -74,4 +82,6 @@ def inject_payment_lifecycle_anomalies(
         state=state,
     )
 
-    return state.anomalies
+    return state.anomalies[
+        start_index:
+    ]

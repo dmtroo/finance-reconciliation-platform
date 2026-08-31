@@ -5,8 +5,30 @@ from datetime import (
     date,
     datetime,
 )
+from decimal import Decimal
 
 import pytest
+
+CAPTURE_AMOUNTS = {
+    2: 10000,
+    3: 20000,
+    4: 20000,
+    5: 50000,
+    6: 50000,
+    7: 10000,
+    8: 40000,
+    9: 60000,
+    10: 70000,
+    11: 80000,
+    12: 90000,
+    13: 110000,
+    14: 120000,
+    15: 130000,
+    16: 140000,
+    17: 150000,
+    18: 160000,
+    19: 170000,
+}
 
 
 def financial_event(
@@ -51,67 +73,116 @@ def financial_event(
     }
 
 
+def accounting_entry(
+    *,
+    journal_entry_id: str,
+    source_reference_type: str,
+    source_reference: str,
+    debit_account: str,
+    credit_account: str,
+    amount_minor: int,
+) -> list[dict[str, object]]:
+    return [
+        {
+            "journal_line_id": (
+                f"{journal_entry_id}-01"
+            ),
+            "journal_entry_id": (
+                journal_entry_id
+            ),
+            "account_code": (
+                debit_account
+            ),
+            "debit_amount_minor": (
+                amount_minor
+            ),
+            "credit_amount_minor": 0,
+            "source_reference_type": (
+                source_reference_type
+            ),
+            "source_reference": (
+                source_reference
+            ),
+        },
+        {
+            "journal_line_id": (
+                f"{journal_entry_id}-02"
+            ),
+            "journal_entry_id": (
+                journal_entry_id
+            ),
+            "account_code": (
+                credit_account
+            ),
+            "debit_amount_minor": 0,
+            "credit_amount_minor": (
+                amount_minor
+            ),
+            "source_reference_type": (
+                source_reference_type
+            ),
+            "source_reference": (
+                source_reference
+            ),
+        },
+    ]
+
+
 @pytest.fixture
 def clean_lifecycle_tables() -> dict[
     str,
     list[dict[str, object]],
 ]:
-    invoices = [
-    {
-        "invoice_id": "INV-001",
-        "invoice_status": "UNCOLLECTIBLE",
-        "currency": "USD",
-        "total_amount_minor": 10000,
-    },
-    {
-        "invoice_id": "INV-002",
-        "invoice_status": "PAID",
-        "currency": "USD",
-        "total_amount_minor": 10000,
-    },
-    {
-        "invoice_id": "INV-003",
-        "invoice_status": "PAID",
-        "currency": "USD",
-        "total_amount_minor": 20000,
-    },
-    {
-        "invoice_id": "INV-004",
-        "invoice_status": "PAID",
-        "currency": "USD",
-        "total_amount_minor": 20000,
-    },
-    {
-        "invoice_id": "INV-005",
-        "invoice_status": "PAID",
-        "currency": "USD",
-        "total_amount_minor": 50000,
-    },
-    {
-        "invoice_id": "INV-006",
-        "invoice_status": "PAID",
-        "currency": "USD",
-        "total_amount_minor": 50000,
-    },
-    {
-        "invoice_id": "INV-007",
-        "invoice_status": "PAID",
-        "currency": "USD",
-        "total_amount_minor": 10000,
-    },
-    {
-        "invoice_id": "INV-008",
-        "invoice_status": "PAID",
-        "currency": "USD",
-        "total_amount_minor": 40000,
-    },
-    {
-        "invoice_id": "INV-009",
-        "invoice_status": "PAID",
-        "currency": "EUR",
-        "total_amount_minor": 60000,
-    },
-]
+    products = [
+        {
+            "product_id": "PROD-001",
+        },
+        {
+            "product_id": "PROD-002",
+        },
+    ]
+
+    invoices: list[
+        dict[str, object]
+    ] = [
+        {
+            "invoice_id": "INV-001",
+            "invoice_status": (
+                "UNCOLLECTIBLE"
+            ),
+            "currency": "USD",
+            "product_id": "PROD-001",
+            "total_amount_minor": 10000,
+        }
+    ]
+
+    for number in range(
+        2,
+        20,
+    ):
+        currency = (
+            "EUR"
+            if number == 9
+            else "USD"
+        )
+
+        invoices.append(
+            {
+                "invoice_id": (
+                    f"INV-{number:03d}"
+                ),
+                "invoice_status": "PAID",
+                "currency": currency,
+                "product_id": (
+                    "PROD-001"
+                ),
+                "total_amount_minor": (
+                    CAPTURE_AMOUNTS[
+                        number
+                    ]
+                ),
+            }
+        )
 
     payment_attempts = [
         {
@@ -123,81 +194,60 @@ def clean_lifecycle_tables() -> dict[
             ),
             "status": "SUCCEEDED",
         }
-        for number in range(
+        for number
+        in range(
             2,
-            10,
+            20,
         )
     ]
 
-    events = [
+    financial_events = [
         financial_event(
-            "EVT-002",
-            attempt_id="ATT-002",
-            event_type="CAPTURE",
-            amount_minor=10000,
-        ),
-        financial_event(
-            "EVT-003",
-            attempt_id="ATT-003",
-            event_type="CAPTURE",
-            amount_minor=20000,
-        ),
-        financial_event(
-            "EVT-004",
-            attempt_id="ATT-004",
-            event_type="CAPTURE",
-            amount_minor=20000,
-        ),
-        financial_event(
-            "EVT-005",
-            attempt_id="ATT-005",
-            event_type="CAPTURE",
-            amount_minor=50000,
-        ),
-        financial_event(
-            "REF-005",
-            attempt_id="ATT-005",
-            event_type="REFUND",
-            amount_minor=10000,
-            original_capture_id=(
-                "EVT-005"
+            f"EVT-{number:03d}",
+            attempt_id=(
+                f"ATT-{number:03d}"
             ),
-        ),
-        financial_event(
-            "EVT-006",
-            attempt_id="ATT-006",
             event_type="CAPTURE",
-            amount_minor=50000,
-        ),
-        financial_event(
-            "REF-006",
-            attempt_id="ATT-006",
-            event_type="REFUND",
-            amount_minor=30000,
-            original_capture_id=(
-                "EVT-006"
+            amount_minor=(
+                CAPTURE_AMOUNTS[
+                    number
+                ]
             ),
-        ),
-        financial_event(
-            "EVT-007",
-            attempt_id="ATT-007",
-            event_type="CAPTURE",
-            amount_minor=10000,
-        ),
-        financial_event(
-            "EVT-008",
-            attempt_id="ATT-008",
-            event_type="CAPTURE",
-            amount_minor=40000,
-        ),
-        financial_event(
-            "EVT-009",
-            attempt_id="ATT-009",
-            event_type="CAPTURE",
-            amount_minor=60000,
-            currency="EUR",
-        ),
+            currency=(
+                "EUR"
+                if number == 9
+                else "USD"
+            ),
+        )
+        for number
+        in range(
+            2,
+            20,
+        )
     ]
+
+    financial_events.extend(
+        [
+            financial_event(
+                "REF-005",
+                attempt_id="ATT-005",
+                event_type="REFUND",
+                amount_minor=10000,
+                original_capture_id=(
+                    "EVT-005"
+                ),
+            ),
+            financial_event(
+                "REF-006",
+                attempt_id="ATT-006",
+                event_type="REFUND",
+                amount_minor=30000,
+                original_capture_id=(
+                    "EVT-006"
+                ),
+            ),
+        ]
+    )
 
     settlement_items: list[
         dict[str, object]
@@ -207,8 +257,16 @@ def clean_lifecycle_tables() -> dict[
         dict[str, object]
     ] = []
 
+    statement_transactions: list[
+        dict[str, object]
+    ] = []
+
+    journal_lines: list[
+        dict[str, object]
+    ] = []
+
     for index, event in enumerate(
-        events,
+        financial_events,
         start=1,
     ):
         event_id = str(
@@ -217,26 +275,24 @@ def clean_lifecycle_tables() -> dict[
             ]
         )
 
-        if event_id == "EVT-009":
-            settlement_id = (
-                "SET-LATE"
-            )
+        gross_amount_minor = int(
+            event["amount_minor"]
+        )
 
-            settlement_date = date(
-                2026,
-                1,
-                12,
-            )
-        else:
-            settlement_id = (
-                f"SET-{index:03d}"
-            )
+        fee_amount_minor = 100
 
-            settlement_date = date(
-                2026,
-                1,
-                11,
-            )
+        net_amount_minor = (
+            gross_amount_minor
+            - fee_amount_minor
+        )
+
+        settlement_id = (
+            f"SET-{index:03d}"
+        )
+
+        bank_reference = (
+            f"BANK-REF-{settlement_id}"
+        )
 
         settlement_items.append(
             {
@@ -249,6 +305,23 @@ def clean_lifecycle_tables() -> dict[
                 "financial_event_id": (
                     event_id
                 ),
+                "gross_amount_minor": (
+                    gross_amount_minor
+                ),
+                "fee_amount_minor": (
+                    fee_amount_minor
+                ),
+                "net_amount_minor": (
+                    net_amount_minor
+                ),
+                "psp_fx_rate": (
+                    Decimal("1.00000000")
+                    if event["currency"]
+                    == "EUR"
+                    else Decimal(
+                        "0.92000000"
+                    )
+                ),
             }
         )
 
@@ -257,20 +330,94 @@ def clean_lifecycle_tables() -> dict[
                 "settlement_id": (
                     settlement_id
                 ),
-                "settlement_date": (
-                    settlement_date
+                "settlement_date": date(
+                    2026,
+                    1,
+                    11,
+                ),
+                "status": "PAID",
+                "currency": "EUR",
+                "gross_amount_minor": (
+                    gross_amount_minor
+                ),
+                "fee_amount_minor": (
+                    fee_amount_minor
+                ),
+                "net_amount_minor": (
+                    net_amount_minor
+                ),
+                "bank_reference": (
+                    bank_reference
                 ),
             }
         )
 
+        statement_transactions.append(
+            {
+                "bank_transaction_id": (
+                    f"BANK-{index:03d}"
+                ),
+                "payment_reference": (
+                    bank_reference
+                ),
+                "status": "BOOKED",
+                "direction": "CREDIT",
+                "currency": "EUR",
+                "amount_minor": (
+                    net_amount_minor
+                ),
+            }
+        )
+
+        event_type = str(
+            event["event_type"]
+        )
+
+        if event_type == "CAPTURE":
+            debit_account = "1200"
+            credit_account = "4000"
+        else:
+            debit_account = "6300"
+            credit_account = "1200"
+
+        journal_lines.extend(
+            accounting_entry(
+                journal_entry_id=(
+                    f"JE-{event_id}"
+                ),
+                source_reference_type=(
+                    "FINANCIAL_EVENT"
+                ),
+                source_reference=event_id,
+                debit_account=(
+                    debit_account
+                ),
+                credit_account=(
+                    credit_account
+                ),
+                amount_minor=(
+                    gross_amount_minor
+                ),
+            )
+        )
+
     return {
+        "products": products,
         "invoices": invoices,
         "payment_attempts": (
             payment_attempts
         ),
-        "financial_events": events,
+        "financial_events": (
+            financial_events
+        ),
         "settlement_items": (
             settlement_items
         ),
         "settlements": settlements,
+        "statement_transactions": (
+            statement_transactions
+        ),
+        "journal_lines": (
+            journal_lines
+        ),
     }
