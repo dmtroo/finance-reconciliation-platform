@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import csv
 from datetime import date, timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-
 
 NORMALIZED_OUTPUT = Path(__file__).with_name(
     "ecb_ci_rates.csv"
@@ -101,7 +100,7 @@ def main() -> None:
             )
 
             units_per_eur = (
-                Decimal("1")
+                Decimal(1)
                 / eur_per_unit
             ).quantize(
                 Decimal("0.00000001"),
