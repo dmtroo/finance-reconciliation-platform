@@ -8,17 +8,12 @@ M1_RUN_DIR ?= data/generated/SYN-42-2026-01-01-2026-01-31-clean
 M1_ECB_RAW ?= data/external/ecb/m1_raw_fixture.csv
 M1_ECB_REFERENCE ?= data/external/ecb/m1_reference_fixture.csv
 
-M5_START_DATE ?= 2026-01-01
-M5_END_DATE ?= 2026-01-31
-
-M5_CONFIG ?= generator/config.with_anomalies.yml
-M5_RUN_DIR ?= data/generated/SYN-42-2026-01-01-2026-01-31-with_anomalies
-
-M5_ECB_RAW ?= data/external/ecb/m5_raw_fixture.csv
-M5_ECB_REFERENCE ?= data/external/ecb/m5_reference_fixture.csv
+M5_CLEAN_RUN_DIR ?= data/generated/SYN-42-2026-01-01-2026-01-31-clean
+M5_ANOMALY_CONFIG ?= generator/config.with_anomalies.yml
 M5_ANOMALY_RUN_DIR ?= data/generated/SYN-42-2026-01-01-2026-01-31-with_anomalies
+M5_ECB_FIXTURE ?= generator/fixtures/ecb_raw_ci_rates.csv
 
-.PHONY: m5-acceptance m5-validate m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate dbt-build-all postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+.PHONY: m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -41,8 +36,9 @@ help:
 	@echo "  dbt-build-marts         Build and test all dbt reconciliation marts"
 	@echo "  m4-validate             Validate the M4 reconciliation mart contract"
 	@echo "  m4-acceptance           Run the complete M4 reconciliation acceptance workflow"
-	@echo "  m5-validate             Validate that injected source anomalies surface as Finance exceptions"
-	@echo "  m5-acceptance           Rebuild from a clean DB with the with_anomalies scenario and validate M5"
+	@echo "  m5-validate             Validate the deterministic clean vs with_anomalies generator scenarios"
+	@echo "  m5-anomaly-validate     Validate that injected source anomalies surface as Finance exceptions"
+	@echo "  m5-acceptance           Run the complete M5 anomaly acceptance workflow"
 
 validate-contract:
 	python scripts/validate_contract.py
@@ -148,40 +144,35 @@ m4-acceptance:
 	$(MAKE) dbt-build-marts
 	$(MAKE) m4-validate
 
-dbt-build-all:
-	cd dbt && DBT_PROFILES_DIR=. dbt build --indirect-selection=buildable
-
-m5-validate:
-	python scripts/validate_m5_anomalies.py \
-		--run-dir "$(M5_RUN_DIR)"
-
-# The with_anomalies scenario mutates append-mode source tables
-# (financial_events, journal_lines, ...), so it must be loaded into a
-# clean raw layer. Reload onto a dirty DB keeps stale rows and hides
-# anomalies (append inserts are on conflict do nothing).
-m5-acceptance:
-	$(MAKE) lint
-	$(MAKE) test
-	$(MAKE) validate-contract
-	$(MAKE) postgres-reset
-	$(MAKE) postgres-wait
-	finance-recon generate \
-		--config "$(M5_CONFIG)"
-	finance-recon ecb-extract \
-		--start-date "$(M5_START_DATE)" \
-		--end-date "$(M5_END_DATE)" \
-		--mode fixture \
-		--raw-output "$(M5_ECB_RAW)" \
-		--reference-output "$(M5_ECB_REFERENCE)"
-	finance-recon load \
-		--run-dir "$(M5_RUN_DIR)"
-	finance-recon ecb-load \
-		--input "$(M5_ECB_RAW)"
-	$(MAKE) dbt-build-all
-	$(MAKE) m5-validate
-
 m5-anomaly-validate:
 	@test -n "$(M5_ANOMALY_RUN_DIR)" || \
 		(echo "M5_ANOMALY_RUN_DIR is required"; exit 1)
 	python scripts/validate_m5_anomalies.py \
 		--run-dir "$(M5_ANOMALY_RUN_DIR)"
+
+m5-validate:
+	python scripts/validate_m5.py \
+		--clean-run-dir "$(M5_CLEAN_RUN_DIR)" \
+		--anomaly-run-dir "$(M5_ANOMALY_RUN_DIR)"
+
+m5-anomaly-pipeline:
+	finance-recon generate \
+		--config "$(M5_ANOMALY_CONFIG)"
+	$(MAKE) postgres-reset
+	$(MAKE) postgres-wait
+	finance-recon load \
+		--run-dir "$(M5_ANOMALY_RUN_DIR)"
+	finance-recon ecb-load \
+		--input "$(M5_ECB_FIXTURE)"
+	$(MAKE) dbt-build-staging
+	$(MAKE) dbt-build-intermediate
+	$(MAKE) dbt-build-marts
+	$(MAKE) m5-anomaly-validate \
+		M5_ANOMALY_RUN_DIR="$(M5_ANOMALY_RUN_DIR)"
+
+m5-acceptance:
+	$(MAKE) postgres-reset
+	$(MAKE) postgres-wait
+	$(MAKE) m4-acceptance
+	$(MAKE) m5-anomaly-pipeline
+	$(MAKE) m5-validate
