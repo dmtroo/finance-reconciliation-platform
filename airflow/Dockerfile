@@ -17,7 +17,9 @@ COPY --chown=airflow:root \
     src \
     /opt/airflow/project/src
 
+# The [dbt] extra pulls in dbt-postgres so the finance_reconciliation_pipeline
+# DAG's dbt_* tasks (airflow/run_dbt.py) can build the reconciliation layers.
 RUN pip install \
     --no-cache-dir \
     "apache-airflow==${AIRFLOW_VERSION}" \
-    -e /opt/airflow/project
+    -e "/opt/airflow/project[dbt]"

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 DAG_ID = (
-    "finance_reconciliation_ingestion"
+    "finance_reconciliation_pipeline"
 )
 
 EXPECTED_TASK_IDS = {
@@ -15,13 +15,17 @@ EXPECTED_TASK_IDS = {
     "load_private_raw",
     "load_ecb_reference_raw",
     "ingestion_complete",
+    "dbt_staging",
+    "dbt_intermediate",
+    "dbt_marts",
+    "pipeline_complete",
 }
 
 
-class AirflowDagValidationError(
+class AirflowPipelineValidationError(
     RuntimeError
 ):
-    """Raised when the ingestion DAG contract fails."""
+    """Raised when the Airflow pipeline contract fails."""
 
 
 def run_command(
@@ -81,21 +85,66 @@ def validate_finance_cli(
         ]
     )
 
-    if (
-        "generate"
+    required_commands = {
+        "generate",
+        "load",
+        "ecb-load",
+    }
+
+    missing = {
+        command
+        for command
+        in required_commands
+        if command
         not in result.stdout
-        or "load"
-        not in result.stdout
-    ):
-        raise AirflowDagValidationError(
-            "finance-recon CLI is not "
-            "available in the Airflow "
-            "image"
+    }
+
+    if missing:
+        raise AirflowPipelineValidationError(
+            "finance-recon CLI is "
+            "missing required commands: "
+            f"{sorted(missing)}"
         )
 
     print(
         "Airflow image: "
         "finance-recon CLI available."
+    )
+
+
+def validate_dbt_cli(
+    *,
+    compose_file: Path,
+) -> None:
+    result = run_command(
+        [
+            *compose_command(
+                compose_file
+            ),
+            "exec",
+            "-T",
+            "airflow-api-server",
+            "dbt",
+            "--version",
+        ]
+    )
+
+    output = result.stdout
+
+    if (
+        "Core:" not in output
+        or "postgres" not in output.lower()
+    ):
+        raise AirflowPipelineValidationError(
+            "dbt Core with PostgreSQL "
+            "adapter is not available "
+            "in the Airflow image"
+        )
+
+    print(
+        "Airflow image: "
+        "dbt Core and PostgreSQL "
+        "adapter available."
     )
 
 
@@ -109,7 +158,7 @@ def load_json_output(
             output
         )
     except json.JSONDecodeError as exc:
-        raise AirflowDagValidationError(
+        raise AirflowPipelineValidationError(
             f"{label} did not return "
             "valid JSON"
         ) from exc
@@ -136,7 +185,7 @@ def validate_import_errors(
     )
 
     if errors:
-        raise AirflowDagValidationError(
+        raise AirflowPipelineValidationError(
             "Airflow DAG import errors "
             f"found: {errors}"
         )
@@ -169,21 +218,23 @@ def validate_dag_exists(
             row["dag_id"]
         )
         for row in dags
-        if isinstance(
-            row,
-            dict,
+        if (
+            isinstance(
+                row,
+                dict,
+            )
+            and "dag_id" in row
         )
-        and "dag_id" in row
     }
 
     if DAG_ID not in dag_ids:
-        raise AirflowDagValidationError(
+        raise AirflowPipelineValidationError(
             f"Expected DAG {DAG_ID!r} "
             "was not discovered"
         )
 
     print(
-        f"Airflow DAG discovered: "
+        "Airflow DAG discovered: "
         f"{DAG_ID}."
     )
 
@@ -220,30 +271,34 @@ def validate_task_contract(
             - EXPECTED_TASK_IDS
         )
 
-        raise AirflowDagValidationError(
-            "Ingestion DAG task contract "
-            "does not match. "
+        raise AirflowPipelineValidationError(
+            "Airflow pipeline task "
+            "contract does not match. "
             f"Missing={missing}, "
             f"unexpected={unexpected}"
         )
 
     print(
-        "Airflow ingestion tasks: "
-        "4/4 expected tasks found."
+        "Airflow pipeline tasks: "
+        "8/8 expected tasks found."
     )
 
 
-def validate_airflow_ingestion_dag(
+def validate_airflow_pipeline(
     *,
     compose_file: Path,
 ) -> None:
     if not compose_file.exists():
-        raise AirflowDagValidationError(
+        raise AirflowPipelineValidationError(
             "Compose file does not exist: "
             f"{compose_file}"
         )
 
     validate_finance_cli(
+        compose_file=compose_file
+    )
+
+    validate_dbt_cli(
         compose_file=compose_file
     )
 
@@ -260,7 +315,7 @@ def validate_airflow_ingestion_dag(
     )
 
     print(
-        "Airflow ingestion DAG "
+        "Airflow reconciliation pipeline "
         "validation passed."
     )
 
@@ -269,7 +324,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Validate the M6 Airflow "
-            "Finance ingestion DAG."
+            "Finance reconciliation "
+            "pipeline DAG."
         )
     )
 
@@ -283,7 +339,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    validate_airflow_ingestion_dag(
+    validate_airflow_pipeline(
         compose_file=(
             args.compose_file
         )

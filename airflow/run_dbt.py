@@ -9,41 +9,50 @@ from runtime_env import (
 )
 
 
-def run_finance_recon(
+def run_dbt(
     arguments: list[str],
 ) -> None:
     if not arguments:
         raise ValueError(
-            "finance-recon command "
-            "arguments are required"
+            "dbt command arguments "
+            "are required"
         )
 
     root = project_root()
 
-    if not root.exists():
+    dbt_root = (
+        root
+        / "dbt"
+    )
+
+    if not dbt_root.exists():
         raise RuntimeError(
-            "Finance reconciliation "
-            "project root does not exist: "
-            f"{root}"
+            "dbt project directory "
+            "does not exist: "
+            f"{dbt_root}"
         )
 
     environment = build_environment(
         root
     )
 
+    environment[
+        "DBT_PROFILES_DIR"
+    ] = "."
+
     subprocess.run(
         [
-            "finance-recon",
+            "dbt",
             *arguments,
         ],
-        cwd=root,
+        cwd=dbt_root,
         env=environment,
         check=True,
     )
 
 
 def main() -> None:
-    run_finance_recon(
+    run_dbt(
         sys.argv[1:]
     )
 
