@@ -13,7 +13,10 @@ M5_ANOMALY_CONFIG ?= generator/config.with_anomalies.yml
 M5_ANOMALY_RUN_DIR ?= data/generated/SYN-42-2026-01-01-2026-01-31-with_anomalies
 M5_ECB_FIXTURE ?= generator/fixtures/ecb_raw_ci_rates.csv
 
-.PHONY: m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+AIRFLOW_COMPOSE := docker compose -f docker-compose.airflow.yml
+AIRFLOW_UID ?= $(shell id -u)
+
+.PHONY: airflow-reset airflow-down airflow-smoke airflow-logs airflow-ps airflow-init airflow-up m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -176,3 +179,38 @@ m5-acceptance:
 	$(MAKE) m4-acceptance
 	$(MAKE) m5-anomaly-pipeline
 	$(MAKE) m5-validate
+
+airflow-init:
+	AIRFLOW_UID="$(AIRFLOW_UID)" \
+	$(AIRFLOW_COMPOSE) up airflow-init
+
+airflow-up:
+	AIRFLOW_UID="$(AIRFLOW_UID)" \
+	$(AIRFLOW_COMPOSE) up -d \
+		airflow-api-server \
+		airflow-scheduler \
+		airflow-dag-processor
+
+airflow-ps:
+	$(AIRFLOW_COMPOSE) ps
+
+airflow-logs:
+	$(AIRFLOW_COMPOSE) logs -f \
+		airflow-api-server \
+		airflow-scheduler \
+		airflow-dag-processor
+
+airflow-smoke:
+	python scripts/validate_airflow_runtime.py
+
+airflow-down:
+	$(AIRFLOW_COMPOSE) stop \
+		airflow-api-server \
+		airflow-scheduler \
+		airflow-dag-processor \
+		airflow-postgres
+
+airflow-reset:
+	$(AIRFLOW_COMPOSE) down \
+		-v \
+		--remove-orphans
