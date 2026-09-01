@@ -27,3 +27,7 @@ dbt/dbt_packages/
 # Runtime external-source extracts / caches
 data/external/*
 !data/external/.gitkeep
+
+# Airflow runtime
+airflow/logs/*
+!airflow/logs/.gitkeep

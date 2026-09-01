@@ -99,6 +99,16 @@ def load_ecb_extract(
     ]
 
     with connect() as connection, connection.cursor() as cursor:
+        # Each extract is the authoritative source-oriented dataset for
+        # its date range (see validate_m1.py's exact-match check
+        # against --ecb-file). Replacing rather than merging keeps
+        # raw_ecb.fx_rates from accumulating stale rows left over from
+        # a previously loaded, differently-scoped extract (e.g. the
+        # wider M5 fixture leaking into an M1 acceptance run).
+        cursor.execute(
+            "delete from raw_ecb.fx_rates"
+        )
+
         cursor.executemany(
             query,
             parameters,

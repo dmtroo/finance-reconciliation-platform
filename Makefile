@@ -13,7 +13,10 @@ M5_ANOMALY_CONFIG ?= generator/config.with_anomalies.yml
 M5_ANOMALY_RUN_DIR ?= data/generated/SYN-42-2026-01-01-2026-01-31-with_anomalies
 M5_ECB_FIXTURE ?= generator/fixtures/ecb_raw_ci_rates.csv
 
-.PHONY: m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+AIRFLOW_COMPOSE := docker compose -f docker-compose.airflow.yml
+AIRFLOW_UID ?= $(shell id -u)
+
+.PHONY: airflow-workflow-acceptance airflow-reconciliation-check airflow-workflow-validate airflow-acceptance airflow-wait airflow-pipeline-check airflow-build airflow-reset airflow-down airflow-smoke airflow-logs airflow-ps airflow-init airflow-up m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -39,6 +42,11 @@ help:
 	@echo "  m5-validate             Validate the deterministic clean vs with_anomalies generator scenarios"
 	@echo "  m5-anomaly-validate     Validate that injected source anomalies surface as Finance exceptions"
 	@echo "  m5-acceptance           Run the complete M5 anomaly acceptance workflow"
+	@echo "  airflow-pipeline-check  Validate the M6 Airflow reconciliation pipeline DAG contract"
+	@echo "  airflow-acceptance      Rebuild, start, and validate the M6 Airflow pipeline DAG"
+	@echo "  airflow-workflow-validate     Run the M6 pipeline DAG twice and check RAW idempotency + clean reconciliation"
+	@echo "  airflow-reconciliation-check  airflow-smoke + airflow-pipeline-check + airflow-workflow-validate"
+	@echo "  airflow-workflow-acceptance   Business-DB clean room, then airflow-reconciliation-check"
 
 validate-contract:
 	python scripts/validate_contract.py
@@ -79,7 +87,12 @@ load-run:
 
 postgres-wait:
 	@echo "Waiting for PostgreSQL..."
-	@until docker compose exec -T postgres sh -lc 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' >/dev/null 2>&1; do sleep 1; done
+	@# -h 127.0.0.1 + a real query force a TCP client path: during a
+	@# fresh initdb the temporary server listens on the unix socket only,
+	@# so a socket pg_isready reports ready before the port clients
+	@# actually use is accepting connections.
+	@until docker compose exec -T postgres sh -lc 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' >/dev/null 2>&1; do sleep 1; done
+	@until docker compose exec -T postgres sh -lc 'psql -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -tAc "select 1"' >/dev/null 2>&1; do sleep 1; done
 	@echo "PostgreSQL is ready."
 
 m1-validate:
@@ -176,3 +189,88 @@ m5-acceptance:
 	$(MAKE) m4-acceptance
 	$(MAKE) m5-anomaly-pipeline
 	$(MAKE) m5-validate
+
+airflow-init:
+	AIRFLOW_UID="$(AIRFLOW_UID)" \
+	$(AIRFLOW_COMPOSE) up airflow-init
+
+airflow-up:
+	AIRFLOW_UID="$(AIRFLOW_UID)" \
+	$(AIRFLOW_COMPOSE) up -d \
+		airflow-api-server \
+		airflow-scheduler \
+		airflow-dag-processor
+
+airflow-ps:
+	$(AIRFLOW_COMPOSE) ps
+
+airflow-logs:
+	$(AIRFLOW_COMPOSE) logs -f \
+		airflow-api-server \
+		airflow-scheduler \
+		airflow-dag-processor
+
+airflow-smoke:
+	python scripts/validate_airflow_runtime.py
+
+airflow-down:
+	$(AIRFLOW_COMPOSE) stop \
+		airflow-api-server \
+		airflow-scheduler \
+		airflow-dag-processor \
+		airflow-postgres
+
+airflow-reset:
+	$(AIRFLOW_COMPOSE) down \
+		-v \
+		--remove-orphans
+
+airflow-build:
+	AIRFLOW_UID="$(AIRFLOW_UID)" \
+	$(AIRFLOW_COMPOSE) build
+
+airflow-pipeline-check:
+	python scripts/validate_airflow_pipeline_dag.py
+
+airflow-wait:
+	@echo "Waiting for Airflow services to become healthy..."
+	@for svc in airflow-api-server airflow-scheduler airflow-dag-processor; do \
+		printf '  %s' "$$svc"; \
+		until [ "$$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' \
+			$$($(AIRFLOW_COMPOSE) ps -q $$svc 2>/dev/null) 2>/dev/null)" = "healthy" ]; do \
+			printf '.'; sleep 3; \
+		done; \
+		printf ' healthy\n'; \
+	done
+
+# airflow-pipeline-check and airflow-smoke only check an already-running
+# stack (like m1-validate etc. check an already-built DB/dbt state), so
+# this brings the stack up from a clean slate before checking it.
+airflow-acceptance:
+	$(MAKE) airflow-reset
+	$(MAKE) airflow-build
+	$(MAKE) airflow-init
+	$(MAKE) airflow-up
+	$(MAKE) airflow-wait
+	$(MAKE) airflow-smoke
+	$(MAKE) airflow-pipeline-check
+
+airflow-workflow-validate:
+	python scripts/validate_airflow_workflow.py
+
+# Runtime health + DAG structure + real repeated execution. Assumes the
+# Airflow stack is already up.
+airflow-reconciliation-check:
+	$(MAKE) airflow-smoke
+	$(MAKE) airflow-pipeline-check
+	$(MAKE) airflow-workflow-validate
+
+# Business-DB clean room, then the full reconciliation check. Airflow
+# metadata is deliberately kept (the workflow validator uses its own
+# run ids), so no airflow-reset here.
+airflow-workflow-acceptance:
+	$(MAKE) postgres-reset
+	$(MAKE) postgres-wait
+	$(MAKE) airflow-up
+	$(MAKE) airflow-wait
+	$(MAKE) airflow-reconciliation-check
