@@ -16,7 +16,7 @@ M5_ECB_FIXTURE ?= generator/fixtures/ecb_raw_ci_rates.csv
 AIRFLOW_COMPOSE := docker compose -f docker-compose.airflow.yml
 AIRFLOW_UID ?= $(shell id -u)
 
-.PHONY: airflow-acceptance airflow-wait airflow-pipeline-check airflow-build airflow-reset airflow-down airflow-smoke airflow-logs airflow-ps airflow-init airflow-up m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+.PHONY: airflow-workflow-acceptance airflow-reconciliation-check airflow-workflow-validate airflow-acceptance airflow-wait airflow-pipeline-check airflow-build airflow-reset airflow-down airflow-smoke airflow-logs airflow-ps airflow-init airflow-up m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -44,6 +44,9 @@ help:
 	@echo "  m5-acceptance           Run the complete M5 anomaly acceptance workflow"
 	@echo "  airflow-pipeline-check  Validate the M6 Airflow reconciliation pipeline DAG contract"
 	@echo "  airflow-acceptance      Rebuild, start, and validate the M6 Airflow pipeline DAG"
+	@echo "  airflow-workflow-validate     Run the M6 pipeline DAG twice and check RAW idempotency + clean reconciliation"
+	@echo "  airflow-reconciliation-check  airflow-smoke + airflow-pipeline-check + airflow-workflow-validate"
+	@echo "  airflow-workflow-acceptance   Business-DB clean room, then airflow-reconciliation-check"
 
 validate-contract:
 	python scripts/validate_contract.py
@@ -246,3 +249,23 @@ airflow-acceptance:
 	$(MAKE) airflow-wait
 	$(MAKE) airflow-smoke
 	$(MAKE) airflow-pipeline-check
+
+airflow-workflow-validate:
+	python scripts/validate_airflow_workflow.py
+
+# Runtime health + DAG structure + real repeated execution. Assumes the
+# Airflow stack is already up.
+airflow-reconciliation-check:
+	$(MAKE) airflow-smoke
+	$(MAKE) airflow-pipeline-check
+	$(MAKE) airflow-workflow-validate
+
+# Business-DB clean room, then the full reconciliation check. Airflow
+# metadata is deliberately kept (the workflow validator uses its own
+# run ids), so no airflow-reset here.
+airflow-workflow-acceptance:
+	$(MAKE) postgres-reset
+	$(MAKE) postgres-wait
+	$(MAKE) airflow-up
+	$(MAKE) airflow-wait
+	$(MAKE) airflow-reconciliation-check

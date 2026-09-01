@@ -18,8 +18,15 @@ EXPECTED_TASK_IDS = {
     "dbt_staging",
     "dbt_intermediate",
     "dbt_marts",
+    "validate_reconciliation",
     "pipeline_complete",
 }
+
+# The validate_reconciliation task must run this exact script - the same
+# one `make m4-validate` runs - not a second copy of the M4 logic.
+RECONCILIATION_VALIDATOR = (
+    "/opt/airflow/project/scripts/validate_m4.py"
+)
 
 
 class AirflowPipelineValidationError(
@@ -145,6 +152,55 @@ def validate_dbt_cli(
         "Airflow image: "
         "dbt Core and PostgreSQL "
         "adapter available."
+    )
+
+
+def validate_reconciliation_validator(
+    *,
+    compose_file: Path,
+) -> None:
+    # Import validate_m4.py inside the Airflow image without executing it,
+    # so we know the same clean-reconciliation validator the DAG's
+    # validate_reconciliation task shells out to is present and all of
+    # its imports (finance_reconciliation, psycopg, dotenv, yaml)
+    # resolve there.
+    snippet = (
+        "import importlib.util as u, pathlib; "
+        f"p = pathlib.Path({RECONCILIATION_VALIDATOR!r}); "
+        "assert p.is_file(), 'validate_m4.py is missing'; "
+        "spec = u.spec_from_file_location('m4_validator', p); "
+        "mod = u.module_from_spec(spec); "
+        "spec.loader.exec_module(mod); "
+        "assert callable(getattr(mod, 'validate_m4', None)), "
+        "'validate_m4() is not defined'; "
+        "print('ok')"
+    )
+
+    result = run_command(
+        [
+            *compose_command(
+                compose_file
+            ),
+            "exec",
+            "-T",
+            "airflow-api-server",
+            "python",
+            "-c",
+            snippet,
+        ]
+    )
+
+    if "ok" not in result.stdout:
+        raise AirflowPipelineValidationError(
+            "clean Finance reconciliation "
+            "validator is not importable "
+            "in the Airflow image"
+        )
+
+    print(
+        "Airflow image: "
+        "clean reconciliation (M4) "
+        "validator available."
     )
 
 
@@ -280,7 +336,9 @@ def validate_task_contract(
 
     print(
         "Airflow pipeline tasks: "
-        "8/8 expected tasks found."
+        f"{len(EXPECTED_TASK_IDS)}/"
+        f"{len(EXPECTED_TASK_IDS)} "
+        "expected tasks found."
     )
 
 
@@ -299,6 +357,10 @@ def validate_airflow_pipeline(
     )
 
     validate_dbt_cli(
+        compose_file=compose_file
+    )
+
+    validate_reconciliation_validator(
         compose_file=compose_file
     )
 

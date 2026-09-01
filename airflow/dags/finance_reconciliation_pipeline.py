@@ -33,6 +33,10 @@ DBT_RUNNER = (
     / "run_dbt.py"
 )
 
+RECONCILIATION_VALIDATOR = (
+    "scripts/validate_m4.py"
+)
+
 CLEAN_CONFIG = (
     "generator/config.example.yml"
 )
@@ -77,14 +81,45 @@ def run_dbt(
     )
 
 
+def run_reconciliation_validator() -> None:
+    # runtime_env lives next to run_finance_recon.py / run_dbt.py, not
+    # on the DAG's import path. Reuse its .env loading + database-host
+    # rewrite so validate_m4.py reaches the business PostgreSQL from
+    # inside the container.
+    if str(AIRFLOW_RUNTIME_ROOT) not in sys.path:
+        sys.path.insert(
+            0,
+            str(AIRFLOW_RUNTIME_ROOT),
+        )
+
+    from runtime_env import (
+        build_environment,
+        project_root,
+    )
+
+    root = project_root()
+
+    subprocess.run(
+        [
+            sys.executable,
+            RECONCILIATION_VALIDATOR,
+        ],
+        cwd=root,
+        env=build_environment(root),
+        check=True,
+    )
+
+
 @dag(
     dag_id=(
         "finance_reconciliation_pipeline"
     ),
     description=(
         "Generate Finance sources, "
-        "load RAW data, and build "
-        "reconciliation dbt layers."
+        "load RAW data, build "
+        "reconciliation dbt layers, and "
+        "gate on the clean Finance "
+        "reconciliation contract."
     ),
     schedule=None,
     start_date=datetime(
@@ -172,6 +207,13 @@ def finance_reconciliation_pipeline():
         )
 
     @task()
+    def validate_reconciliation() -> None:
+        # Gate: the run only succeeds when the clean Finance
+        # reconciliation contract (M4) still holds after the marts
+        # rebuild.
+        run_reconciliation_validator()
+
+    @task()
     def pipeline_complete() -> None:
         print(
             "Finance reconciliation "
@@ -207,6 +249,10 @@ def finance_reconciliation_pipeline():
         dbt_marts()
     )
 
+    reconciled = (
+        validate_reconciliation()
+    )
+
     completed = (
         pipeline_complete()
     )
@@ -223,6 +269,7 @@ def finance_reconciliation_pipeline():
         >> staging
         >> intermediate
         >> marts
+        >> reconciled
         >> completed
     )
 
