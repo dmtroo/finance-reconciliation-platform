@@ -6,6 +6,12 @@ from typing import Any
 from finance_reconciliation.generator.accounting import (
     generate_accounting_journals,
 )
+from finance_reconciliation.generator.anomalies.injector import (
+    inject_anomalies,
+)
+from finance_reconciliation.generator.anomalies.models import (
+    AnomalyRecord,
+)
 from finance_reconciliation.generator.bank import (
     generate_bank_transactions,
 )
@@ -14,16 +20,30 @@ from finance_reconciliation.generator.billing import (
     generate_products,
     generate_subscriptions,
 )
-from finance_reconciliation.generator.catalog import load_catalog
-from finance_reconciliation.generator.columns import CSV_FIELDS
-from finance_reconciliation.generator.config import GeneratorConfig
+from finance_reconciliation.generator.catalog import (
+    load_catalog,
+)
+from finance_reconciliation.generator.columns import (
+    CSV_FIELDS,
+)
+from finance_reconciliation.generator.config import (
+    GeneratorConfig,
+)
 from finance_reconciliation.generator.fx import (
     ReferenceFxProvider,
 )
-from finance_reconciliation.generator.ids import IdFactory
-from finance_reconciliation.generator.io import write_csv
-from finance_reconciliation.generator.payments import generate_payment_sources
-from finance_reconciliation.generator.randomness import DeterministicRandom
+from finance_reconciliation.generator.ids import (
+    IdFactory,
+)
+from finance_reconciliation.generator.io import (
+    write_csv,
+)
+from finance_reconciliation.generator.payments import (
+    generate_payment_sources,
+)
+from finance_reconciliation.generator.randomness import (
+    DeterministicRandom,
+)
 from finance_reconciliation.generator.settlements import (
     generate_settlement_sources,
 )
@@ -45,19 +65,16 @@ class CleanDataset:
 
     journal_lines: list[dict[str, Any]]
 
-def generate_clean_dataset(
+
+@dataclass
+class GenerationResult:
+    dataset: CleanDataset
+    anomalies: list[AnomalyRecord]
+
+
+def _generate_base_dataset(
     config: GeneratorConfig,
 ) -> CleanDataset:
-    if config.scenario != "clean":
-        raise ValueError(
-            "Commit 7 generator supports only scenario=clean"
-        )
-
-    if config.data["anomalies"]["enabled"]:
-        raise ValueError(
-            "Anomaly generation is not implemented in the clean pipeline"
-        )
-
     rng = DeterministicRandom(
         config.seed
     )
@@ -87,27 +104,29 @@ def generate_clean_dataset(
         ids=ids,
     )
 
-    payment_attempts, financial_events = (
-        generate_payment_sources(
-            config=config,
-            invoices=invoices,
-            rng=rng,
-            ids=ids,
-        )
+    (
+        payment_attempts,
+        financial_events,
+    ) = generate_payment_sources(
+        config=config,
+        invoices=invoices,
+        rng=rng,
+        ids=ids,
     )
 
     fx = ReferenceFxProvider.from_csv(
         config.fx_reference_path
     )
 
-    settlements, settlement_items = (
-        generate_settlement_sources(
-            config=config,
-            financial_events=financial_events,
-            fx=fx,
-            rng=rng,
-            ids=ids,
-        )
+    (
+        settlements,
+        settlement_items,
+    ) = generate_settlement_sources(
+        config=config,
+        financial_events=financial_events,
+        fx=fx,
+        rng=rng,
+        ids=ids,
     )
 
     bank_transactions = (
@@ -142,6 +161,141 @@ def generate_clean_dataset(
         journal_lines=journal_lines,
     )
 
+
+def generate_clean_dataset(
+    config: GeneratorConfig,
+) -> CleanDataset:
+    if config.scenario != "clean":
+        raise ValueError(
+            "Clean generator requires "
+            "scenario=clean"
+        )
+
+    if config.data["anomalies"]["enabled"]:
+        raise ValueError(
+            "Anomaly generation is not "
+            "allowed in the clean pipeline"
+        )
+
+    return _generate_base_dataset(
+        config
+    )
+
+
+def _dataset_to_anomaly_tables(
+    dataset: CleanDataset,
+) -> dict[
+    str,
+    list[dict[str, Any]],
+]:
+    return {
+        "products": dataset.products,
+        "subscriptions": (
+            dataset.subscriptions
+        ),
+        "invoices": dataset.invoices,
+        "payment_attempts": (
+            dataset.payment_attempts
+        ),
+        "financial_events": (
+            dataset.financial_events
+        ),
+        "settlements": (
+            dataset.settlements
+        ),
+        "settlement_items": (
+            dataset.settlement_items
+        ),
+        "statement_transactions": (
+            dataset.bank_transactions
+        ),
+        "journal_lines": (
+            dataset.journal_lines
+        ),
+    }
+
+
+def _anomaly_tables_to_dataset(
+    tables: dict[
+        str,
+        list[dict[str, Any]],
+    ],
+) -> CleanDataset:
+    return CleanDataset(
+        products=tables["products"],
+        subscriptions=(
+            tables["subscriptions"]
+        ),
+        invoices=tables["invoices"],
+        payment_attempts=(
+            tables["payment_attempts"]
+        ),
+        financial_events=(
+            tables["financial_events"]
+        ),
+        settlements=(
+            tables["settlements"]
+        ),
+        settlement_items=(
+            tables["settlement_items"]
+        ),
+        bank_transactions=(
+            tables[
+                "statement_transactions"
+            ]
+        ),
+        journal_lines=(
+            tables["journal_lines"]
+        ),
+    )
+
+
+def generate_dataset(
+    config: GeneratorConfig,
+) -> GenerationResult:
+    if config.scenario == "clean":
+        return GenerationResult(
+            dataset=generate_clean_dataset(
+                config
+            ),
+            anomalies=[],
+        )
+
+    if (
+        config.scenario
+        != "with_anomalies"
+    ):
+        raise ValueError(
+            "Unsupported generator "
+            f"scenario: {config.scenario}"
+        )
+
+    clean_dataset = (
+        _generate_base_dataset(
+            config
+        )
+    )
+
+    injection_result = inject_anomalies(
+        _dataset_to_anomaly_tables(
+            clean_dataset
+        )
+    )
+
+    anomalous_dataset = (
+        _anomaly_tables_to_dataset(
+            injection_result.tables
+        )
+    )
+
+    return GenerationResult(
+        dataset=anomalous_dataset,
+        anomalies=(
+            injection_result.anomalies
+        ),
+    )
+
+
 def write_clean_dataset(
     *,
     config: GeneratorConfig,
@@ -159,14 +313,18 @@ def write_clean_dataset(
                 "billing/products"
             ],
         ),
-        "billing/subscriptions": write_csv(
-            output_dir
-            / "billing"
-            / "subscriptions.csv",
-            rows=dataset.subscriptions,
-            fieldnames=CSV_FIELDS[
-                "billing/subscriptions"
-            ],
+        "billing/subscriptions": (
+            write_csv(
+                output_dir
+                / "billing"
+                / "subscriptions.csv",
+                rows=(
+                    dataset.subscriptions
+                ),
+                fieldnames=CSV_FIELDS[
+                    "billing/subscriptions"
+                ],
+            )
         ),
         "billing/invoices": write_csv(
             output_dir
@@ -181,7 +339,9 @@ def write_clean_dataset(
             output_dir
             / "psp"
             / "payment_attempts.csv",
-            rows=dataset.payment_attempts,
+            rows=(
+                dataset.payment_attempts
+            ),
             fieldnames=CSV_FIELDS[
                 "psp/payment_attempts"
             ],
@@ -190,12 +350,14 @@ def write_clean_dataset(
             output_dir
             / "psp"
             / "financial_events.csv",
-            rows=dataset.financial_events,
+            rows=(
+                dataset.financial_events
+            ),
             fieldnames=CSV_FIELDS[
                 "psp/financial_events"
             ],
         ),
-                "psp/settlements": write_csv(
+        "psp/settlements": write_csv(
             output_dir
             / "psp"
             / "settlements.csv",
@@ -208,28 +370,36 @@ def write_clean_dataset(
             output_dir
             / "psp"
             / "settlement_items.csv",
-            rows=dataset.settlement_items,
+            rows=(
+                dataset.settlement_items
+            ),
             fieldnames=CSV_FIELDS[
                 "psp/settlement_items"
             ],
         ),
-        "bank/statement_transactions": write_csv(
-            output_dir
-            / "bank"
-            / "statement_transactions.csv",
-            rows=dataset.bank_transactions,
-            fieldnames=CSV_FIELDS[
-                "bank/statement_transactions"
-            ],
+        "bank/statement_transactions": (
+            write_csv(
+                output_dir
+                / "bank"
+                / "statement_transactions.csv",
+                rows=(
+                    dataset.bank_transactions
+                ),
+                fieldnames=CSV_FIELDS[
+                    "bank/statement_transactions"
+                ],
+            )
         ),
-        "accounting/journal_lines": write_csv(
-            output_dir
-            / "accounting"
-            / "journal_lines.csv",
-            rows=dataset.journal_lines,
-            fieldnames=CSV_FIELDS[
-                "accounting/journal_lines"
-            ],
+        "accounting/journal_lines": (
+            write_csv(
+                output_dir
+                / "accounting"
+                / "journal_lines.csv",
+                rows=dataset.journal_lines,
+                fieldnames=CSV_FIELDS[
+                    "accounting/journal_lines"
+                ],
+            )
         ),
     }
 

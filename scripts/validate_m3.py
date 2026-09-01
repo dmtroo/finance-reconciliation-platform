@@ -11,7 +11,6 @@ from psycopg import sql
 from finance_reconciliation.ingestion.database import connect
 from finance_reconciliation.paths import PROJECT_ROOT
 
-
 EXPECTED_INTERMEDIATE_MODELS = {
     "int_financial_events__with_reference_fx",
     "int_captures__lifecycle",
@@ -807,37 +806,36 @@ def validate_m3() -> None:
         manifest_path
     )
 
-    with connect() as connection:
-        with connection.cursor() as cursor:
-            validate_relation_set(
-                cursor,
-                analytics_schema=analytics_schema,
-            )
+    with connect() as connection, connection.cursor() as cursor:
+        validate_relation_set(
+            cursor,
+            analytics_schema=analytics_schema,
+        )
 
-            validate_primary_grains(
-                cursor,
-                analytics_schema=analytics_schema,
-            )
+        validate_primary_grains(
+            cursor,
+            analytics_schema=analytics_schema,
+        )
 
-            validate_source_reference_summary_grain(
-                cursor,
-                analytics_schema=analytics_schema,
-            )
+        validate_source_reference_summary_grain(
+            cursor,
+            analytics_schema=analytics_schema,
+        )
 
-            validate_clean_fx(
-                cursor,
-                analytics_schema=analytics_schema,
-            )
+        validate_clean_fx(
+            cursor,
+            analytics_schema=analytics_schema,
+        )
 
-            validate_clean_settlement_matching(
-                cursor,
-                analytics_schema=analytics_schema,
-            )
+        validate_clean_settlement_matching(
+            cursor,
+            analytics_schema=analytics_schema,
+        )
 
-            validate_clean_accounting(
-                cursor,
-                analytics_schema=analytics_schema,
-            )
+        validate_clean_accounting(
+            cursor,
+            analytics_schema=analytics_schema,
+        )
 
     print()
     print(
