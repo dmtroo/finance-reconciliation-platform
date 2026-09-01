@@ -16,7 +16,7 @@ M5_ECB_FIXTURE ?= generator/fixtures/ecb_raw_ci_rates.csv
 AIRFLOW_COMPOSE := docker compose -f docker-compose.airflow.yml
 AIRFLOW_UID ?= $(shell id -u)
 
-.PHONY: airflow-reset airflow-down airflow-smoke airflow-logs airflow-ps airflow-init airflow-up m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+.PHONY: airflow-acceptance airflow-wait airflow-ingestion-check airflow-build airflow-reset airflow-down airflow-smoke airflow-logs airflow-ps airflow-init airflow-up m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -42,6 +42,7 @@ help:
 	@echo "  m5-validate             Validate the deterministic clean vs with_anomalies generator scenarios"
 	@echo "  m5-anomaly-validate     Validate that injected source anomalies surface as Finance exceptions"
 	@echo "  m5-acceptance           Run the complete M5 anomaly acceptance workflow"
+	@echo "  airflow-acceptance      Rebuild, start, and validate the M6 Airflow ingestion DAG"
 
 validate-contract:
 	python scripts/validate_contract.py
@@ -214,3 +215,28 @@ airflow-reset:
 	$(AIRFLOW_COMPOSE) down \
 		-v \
 		--remove-orphans
+
+airflow-build:
+	AIRFLOW_UID="$(AIRFLOW_UID)" \
+	$(AIRFLOW_COMPOSE) build
+
+airflow-ingestion-check:
+	python scripts/validate_airflow_ingestion_dag.py
+
+airflow-wait:
+	@echo "Waiting for the Airflow API server..."
+	@until $(AIRFLOW_COMPOSE) exec -T airflow-api-server \
+		curl --fail -s http://localhost:8080/api/v2/monitor/health >/dev/null 2>&1; do sleep 2; done
+	@echo "Airflow API server is ready."
+
+# airflow-ingestion-check and airflow-smoke only check an already-running
+# stack (like m1-validate etc. check an already-built DB/dbt state), so
+# this brings the stack up from a clean slate before checking it.
+airflow-acceptance:
+	$(MAKE) airflow-reset
+	$(MAKE) airflow-build
+	$(MAKE) airflow-init
+	$(MAKE) airflow-up
+	$(MAKE) airflow-wait
+	$(MAKE) airflow-smoke
+	$(MAKE) airflow-ingestion-check

@@ -1,7 +1,10 @@
 name: finance-reconciliation-airflow
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:3.3.1-python3.13
+  build:
+    context: .
+    dockerfile: airflow/Dockerfile
+  image: finance-reconciliation-airflow:3.3.1
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
 
@@ -21,12 +24,30 @@ x-airflow-common: &airflow-common
 
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
 
+    FINANCE_RECON_PROJECT_ROOT: >-
+      /opt/airflow/project
+
+    FINANCE_RECON_CONTAINER_HOST: >-
+      host.docker.internal
+
   user: "${AIRFLOW_UID:-50000}:0"
+
+  # host.docker.internal only resolves out of the box on Docker
+  # Desktop (macOS/Windows); this makes it resolve on Linux hosts too,
+  # which run_finance_recon.py needs to reach the finance-reconciliation
+  # Postgres published by the main docker-compose.yml.
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
 
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
     - ./airflow/plugins:/opt/airflow/plugins
+    # Full repo, at the same path the image installs
+    # finance-reconciliation from (see airflow/Dockerfile). Gives
+    # run_finance_recon.py / finance-recon access to generator/,
+    # data/generated, .env, etc. via PROJECT_ROOT resolution.
+    - .:/opt/airflow/project
 
 
 services:
