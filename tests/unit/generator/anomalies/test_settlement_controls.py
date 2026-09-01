@@ -46,7 +46,7 @@ def test_settlement_total_mismatch_breaks_header_item_total(
     item_gross = sum(
         int(
             row[
-                "gross_amount_minor"
+                "settlement_gross_eur_minor"
             ]
         )
         for row in items

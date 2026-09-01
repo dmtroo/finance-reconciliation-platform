@@ -231,6 +231,14 @@ def inject_duplicate_capture(
         "payment_attempt_id"
     ] = target_attempt_id
 
+    # The reconciliation marts resolve a capture's invoice from
+    # financial_events.invoice_id directly, not through the payment
+    # attempt, so the donor capture must also carry the target
+    # invoice_id for the duplicate to surface as an exception.
+    donor_capture[
+        "invoice_id"
+    ] = target_invoice_id
+
     donor_attempt[
         "status"
     ] = "DECLINED"

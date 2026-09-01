@@ -107,7 +107,7 @@ def inject_settlement_total_mismatch(
 
     clean_value = int(
         target_item[
-            "gross_amount_minor"
+            "settlement_gross_eur_minor"
         ]
     )
 
@@ -117,7 +117,7 @@ def inject_settlement_total_mismatch(
     )
 
     target_item[
-        "gross_amount_minor"
+        "settlement_gross_eur_minor"
     ] = anomalous_value
 
     event_ids = (
@@ -147,7 +147,7 @@ def inject_settlement_total_mismatch(
             ),
             entity_id=settlement_id,
             field_name=(
-                "gross_amount_minor"
+                "settlement_gross_eur_minor"
             ),
             clean_value=clean_value,
             anomalous_value=(

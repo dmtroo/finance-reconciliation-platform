@@ -109,17 +109,17 @@ def test_late_settlement_has_six_day_delay(
         )
     )
 
-    event_timestamp = (
-        event["event_timestamp"]
+    event_at = (
+        event["event_at"]
     )
 
     assert isinstance(
-        event_timestamp,
+        event_at,
         datetime,
     )
 
     event_date = (
-        event_timestamp.date()
+        event_at.date()
     )
 
     settlement_date = (

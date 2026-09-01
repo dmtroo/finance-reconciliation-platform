@@ -85,7 +85,7 @@ def inject_capture_amount_mismatch(
             == capture["currency"]
             and int(
                 invoice[
-                    "total_amount_minor"
+                    "total_minor"
                 ]
             )
             == int(
@@ -122,7 +122,7 @@ def inject_capture_amount_mismatch(
 
     clean_value = int(
         invoice[
-            "total_amount_minor"
+            "total_minor"
         ]
     )
 
@@ -132,7 +132,7 @@ def inject_capture_amount_mismatch(
     )
 
     invoice[
-        "total_amount_minor"
+        "total_minor"
     ] = anomalous_value
 
     state.used_invoice_ids.add(
@@ -153,7 +153,7 @@ def inject_capture_amount_mismatch(
             ),
             entity_id=invoice_id,
             field_name=(
-                "total_amount_minor"
+                "total_minor"
             ),
             clean_value=clean_value,
             anomalous_value=(

@@ -41,6 +41,7 @@ def financial_event(
     original_capture_id: (
         str | None
     ) = None,
+    invoice_id: str | None = None,
     event_day: int = 10,
 ) -> dict[str, object]:
     return {
@@ -49,6 +50,9 @@ def financial_event(
         ),
         "payment_attempt_id": (
             attempt_id
+        ),
+        "invoice_id": (
+            invoice_id
         ),
         "event_type": (
             event_type
@@ -62,7 +66,7 @@ def financial_event(
         "original_capture_id": (
             original_capture_id
         ),
-        "event_timestamp": datetime(
+        "event_at": datetime(
             2026,
             1,
             event_day,
@@ -93,10 +97,10 @@ def accounting_entry(
             "account_code": (
                 debit_account
             ),
-            "debit_amount_minor": (
+            "debit_eur_minor": (
                 amount_minor
             ),
-            "credit_amount_minor": 0,
+            "credit_eur_minor": 0,
             "source_reference_type": (
                 source_reference_type
             ),
@@ -114,8 +118,8 @@ def accounting_entry(
             "account_code": (
                 credit_account
             ),
-            "debit_amount_minor": 0,
-            "credit_amount_minor": (
+            "debit_eur_minor": 0,
+            "credit_eur_minor": (
                 amount_minor
             ),
             "source_reference_type": (
@@ -176,7 +180,7 @@ def clean_lifecycle_tables() -> dict[
                 "product_id": (
                     "PROD-001"
                 ),
-                "total_amount_minor": (
+                "total_minor": (
                     CAPTURE_AMOUNTS[
                         number
                     ]
@@ -207,6 +211,9 @@ def clean_lifecycle_tables() -> dict[
             attempt_id=(
                 f"ATT-{number:03d}"
             ),
+            invoice_id=(
+                f"INV-{number:03d}"
+            ),
             event_type="CAPTURE",
             amount_minor=(
                 CAPTURE_AMOUNTS[
@@ -231,6 +238,7 @@ def clean_lifecycle_tables() -> dict[
             financial_event(
                 "REF-005",
                 attempt_id="ATT-005",
+                invoice_id="INV-005",
                 event_type="REFUND",
                 amount_minor=10000,
                 original_capture_id=(
@@ -240,6 +248,7 @@ def clean_lifecycle_tables() -> dict[
             financial_event(
                 "REF-006",
                 attempt_id="ATT-006",
+                invoice_id="INV-006",
                 event_type="REFUND",
                 amount_minor=30000,
                 original_capture_id=(
@@ -305,13 +314,16 @@ def clean_lifecycle_tables() -> dict[
                 "financial_event_id": (
                     event_id
                 ),
-                "gross_amount_minor": (
+                "transaction_amount_minor": (
                     gross_amount_minor
                 ),
-                "fee_amount_minor": (
+                "settlement_gross_eur_minor": (
+                    gross_amount_minor
+                ),
+                "fee_eur_minor": (
                     fee_amount_minor
                 ),
-                "net_amount_minor": (
+                "settlement_net_eur_minor": (
                     net_amount_minor
                 ),
                 "psp_fx_rate": (
@@ -343,7 +355,7 @@ def clean_lifecycle_tables() -> dict[
                 "fee_amount_minor": (
                     fee_amount_minor
                 ),
-                "net_amount_minor": (
+                "net_payout_minor": (
                     net_amount_minor
                 ),
                 "bank_reference": (

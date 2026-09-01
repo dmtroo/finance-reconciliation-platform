@@ -93,7 +93,7 @@ def _eligible_event_journal_entry(
             for line in lines
             if int(
                 line[
-                    "debit_amount_minor"
+                    "debit_eur_minor"
                 ]
             )
             > 0
@@ -104,7 +104,7 @@ def _eligible_event_journal_entry(
             for line in lines
             if int(
                 line[
-                    "credit_amount_minor"
+                    "credit_eur_minor"
                 ]
             )
             > 0
@@ -197,7 +197,7 @@ def inject_ledger_amount_mismatch(
     clean_debit = sum(
         int(
             line[
-                "debit_amount_minor"
+                "debit_eur_minor"
             ]
         )
         for line in lines
@@ -206,7 +206,7 @@ def inject_ledger_amount_mismatch(
     clean_credit = sum(
         int(
             line[
-                "credit_amount_minor"
+                "credit_eur_minor"
             ]
         )
         for line in lines
@@ -215,19 +215,19 @@ def inject_ledger_amount_mismatch(
     for line in lines:
         debit = int(
             line[
-                "debit_amount_minor"
+                "debit_eur_minor"
             ]
         )
 
         credit = int(
             line[
-                "credit_amount_minor"
+                "credit_eur_minor"
             ]
         )
 
         if debit > 0:
             line[
-                "debit_amount_minor"
+                "debit_eur_minor"
             ] = (
                 debit
                 + LEDGER_MISMATCH_DELTA_MINOR
@@ -235,7 +235,7 @@ def inject_ledger_amount_mismatch(
 
         if credit > 0:
             line[
-                "credit_amount_minor"
+                "credit_eur_minor"
             ] = (
                 credit
                 + LEDGER_MISMATCH_DELTA_MINOR
@@ -244,7 +244,7 @@ def inject_ledger_amount_mismatch(
     anomalous_debit = sum(
         int(
             line[
-                "debit_amount_minor"
+                "debit_eur_minor"
             ]
         )
         for line in lines
@@ -253,7 +253,7 @@ def inject_ledger_amount_mismatch(
     anomalous_credit = sum(
         int(
             line[
-                "credit_amount_minor"
+                "credit_eur_minor"
             ]
         )
         for line in lines
@@ -310,7 +310,7 @@ def inject_unbalanced_journal(
         for line in lines
         if int(
             line[
-                "debit_amount_minor"
+                "debit_eur_minor"
             ]
         )
         > 0
@@ -318,7 +318,7 @@ def inject_unbalanced_journal(
 
     clean_value = int(
         debit_line[
-            "debit_amount_minor"
+            "debit_eur_minor"
         ]
     )
 
@@ -328,7 +328,7 @@ def inject_unbalanced_journal(
     )
 
     debit_line[
-        "debit_amount_minor"
+        "debit_eur_minor"
     ] = anomalous_value
 
     state.used_journal_entry_ids.add(
@@ -349,7 +349,7 @@ def inject_unbalanced_journal(
             ),
             entity_id=event_id,
             field_name=(
-                "debit_amount_minor"
+                "debit_eur_minor"
             ),
             clean_value=clean_value,
             anomalous_value=(

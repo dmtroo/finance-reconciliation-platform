@@ -81,6 +81,79 @@ def test_duplicate_capture_creates_two_captures_for_one_invoice(
     ) == 1
 
 
+def test_duplicate_capture_moves_donor_capture_invoice_id(
+    clean_lifecycle_tables,
+) -> None:
+    result = inject_anomalies(
+        clean_lifecycle_tables
+    )
+
+    anomaly = next(
+        item
+        for item in result.anomalies
+        if item.anomaly_code
+        == "DUPLICATE_CAPTURE"
+    )
+
+    target_attempt_id = str(
+        anomaly.anomalous_value
+    )
+
+    attempts_by_id = {
+        str(
+            attempt[
+                "payment_attempt_id"
+            ]
+        ): attempt
+        for attempt
+        in result.tables[
+            "payment_attempts"
+        ]
+    }
+
+    target_invoice_id = str(
+        attempts_by_id[
+            target_attempt_id
+        ]["invoice_id"]
+    )
+
+    donor_capture = next(
+        event
+        for event
+        in result.tables[
+            "financial_events"
+        ]
+        if str(
+            event["financial_event_id"]
+        )
+        == str(anomaly.entity_id)
+    )
+
+    # The reconciliation marts count captures per
+    # financial_events.invoice_id, so the direct column - not only the
+    # payment_attempt_id - must point at the target invoice.
+    assert (
+        str(donor_capture["invoice_id"])
+        == target_invoice_id
+    )
+
+    invoice_capture_count = sum(
+        1
+        for event
+        in result.tables[
+            "financial_events"
+        ]
+        if (
+            event["event_type"]
+            == "CAPTURE"
+            and str(event["invoice_id"])
+            == target_invoice_id
+        )
+    )
+
+    assert invoice_capture_count == 2
+
+
 def test_duplicate_capture_donor_no_longer_looks_paid(
     clean_lifecycle_tables,
 ) -> None:

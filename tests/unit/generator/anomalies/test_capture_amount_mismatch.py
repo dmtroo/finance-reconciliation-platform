@@ -40,7 +40,7 @@ def financial_event(
         "original_capture_id": (
             original_capture_id
         ),
-        "event_timestamp": datetime(
+        "event_at": datetime(
             2026,
             1,
             event_day,
@@ -63,55 +63,55 @@ def clean_lifecycle_tables() -> dict[
                 "UNCOLLECTIBLE"
             ),
             "currency": "USD",
-            "total_amount_minor": 10000,
+            "total_minor": 10000,
         },
         {
             "invoice_id": "INV-002",
             "invoice_status": "PAID",
             "currency": "USD",
-            "total_amount_minor": 10000,
+            "total_minor": 10000,
         },
         {
             "invoice_id": "INV-003",
             "invoice_status": "PAID",
             "currency": "USD",
-            "total_amount_minor": 20000,
+            "total_minor": 20000,
         },
         {
             "invoice_id": "INV-004",
             "invoice_status": "PAID",
             "currency": "USD",
-            "total_amount_minor": 20000,
+            "total_minor": 20000,
         },
         {
             "invoice_id": "INV-005",
             "invoice_status": "PAID",
             "currency": "USD",
-            "total_amount_minor": 50000,
+            "total_minor": 50000,
         },
         {
             "invoice_id": "INV-006",
             "invoice_status": "PAID",
             "currency": "USD",
-            "total_amount_minor": 50000,
+            "totalt_minor": 50000,
         },
         {
             "invoice_id": "INV-007",
             "invoice_status": "PAID",
             "currency": "USD",
-            "total_amount_minor": 10000,
+            "total_minor": 10000,
         },
         {
             "invoice_id": "INV-008",
             "invoice_status": "PAID",
             "currency": "USD",
-            "total_amount_minor": 40000,
+            "total_minor": 40000,
         },
         {
             "invoice_id": "INV-009",
             "invoice_status": "PAID",
             "currency": "EUR",
-            "total_amount_minor": 60000,
+            "total_minor": 60000,
         },
     ]
 

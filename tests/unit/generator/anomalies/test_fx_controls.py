@@ -37,7 +37,7 @@ def test_missing_fx_rate_moves_non_eur_event_before_fixture_period(
     )
 
     timestamp = (
-        event["event_timestamp"]
+        event["event_at"]
     )
 
     assert isinstance(

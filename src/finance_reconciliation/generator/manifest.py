@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from finance_reconciliation.generator.anomalies.models import (
+    AnomalyRecord,
+)
 from finance_reconciliation.generator.config import (
     GeneratorConfig,
 )
@@ -59,7 +63,14 @@ def write_manifest(
     *,
     config: GeneratorConfig,
     row_counts: dict[str, int],
+    anomalies: list[AnomalyRecord] | None = None,
 ) -> None:
+    anomaly_records = (
+        anomalies
+        if anomalies is not None
+        else []
+    )
+
     manifest: dict[str, Any] = {
         "generator_version": (
             GENERATOR_VERSION
@@ -83,6 +94,11 @@ def write_manifest(
                 row_counts.items()
             )
         ),
+        "anomalies": [
+            asdict(record)
+            for record
+            in anomaly_records
+        ],
         "config_sha256": (
             sha256_file(
                 config.path

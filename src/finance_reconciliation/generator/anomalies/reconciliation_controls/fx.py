@@ -88,7 +88,7 @@ def inject_missing_fx_rate(
     )
 
     original_value = (
-        selected["event_timestamp"]
+        selected["event_at"]
     )
 
     original_timestamp = (
@@ -110,7 +110,7 @@ def inject_missing_fx_rate(
     )
 
     selected[
-        "event_timestamp"
+        "event_at"
     ] = timestamp_like(
         original_value,
         anomalous_timestamp,
@@ -130,14 +130,14 @@ def inject_missing_fx_rate(
             ),
             entity_id=event_id,
             field_name=(
-                "event_timestamp"
+                "event_at"
             ),
             clean_value=str(
                 original_value
             ),
             anomalous_value=str(
                 selected[
-                    "event_timestamp"
+                    "event_at"
                 ]
             ),
         )

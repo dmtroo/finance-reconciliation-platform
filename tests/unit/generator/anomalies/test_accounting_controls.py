@@ -75,7 +75,7 @@ def test_ledger_amount_mismatch_remains_balanced(
     total_debit = sum(
         int(
             line[
-                "debit_amount_minor"
+                "debit_eur_minor"
             ]
         )
         for line in lines
@@ -84,7 +84,7 @@ def test_ledger_amount_mismatch_remains_balanced(
     total_credit = sum(
         int(
             line[
-                "credit_amount_minor"
+                "credit_eur_minor"
             ]
         )
         for line in lines
@@ -132,7 +132,7 @@ def test_unbalanced_journal_has_debit_credit_difference(
     total_debit = sum(
         int(
             line[
-                "debit_amount_minor"
+                "debit_eur_minor"
             ]
         )
         for line in lines
@@ -141,7 +141,7 @@ def test_unbalanced_journal_has_debit_credit_difference(
     total_credit = sum(
         int(
             line[
-                "credit_amount_minor"
+                "credit_eur_minor"
             ]
         )
         for line in lines

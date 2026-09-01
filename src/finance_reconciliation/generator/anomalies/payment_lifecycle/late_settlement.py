@@ -119,7 +119,7 @@ def inject_late_settlement(
 
         event_date = as_date(
             event[
-                "event_timestamp"
+                "event_at"
             ]
         )
 
@@ -160,7 +160,7 @@ def inject_late_settlement(
     )
 
     original_value = (
-        event["event_timestamp"]
+        event["event_at"]
     )
 
     original_timestamp = (
@@ -193,7 +193,7 @@ def inject_late_settlement(
     )
 
     event[
-        "event_timestamp"
+        "event_at"
     ] = timestamp_like(
         original_value,
         anomalous_timestamp,
@@ -213,14 +213,14 @@ def inject_late_settlement(
             ),
             entity_id=event_id,
             field_name=(
-                "event_timestamp"
+                "event_at"
             ),
             clean_value=str(
                 original_value
             ),
             anomalous_value=str(
                 event[
-                    "event_timestamp"
+                    "event_at"
                 ]
             ),
         )

@@ -1,0 +1,97 @@
+version: 1
+seed: 42
+scenario: with_anomalies
+
+# Business-event window. as_of_date is deliberately later so age-based controls have a stable clock.
+date_range:
+  start: "2026-01-01"
+  end: "2026-01-31"
+  as_of_date: "2026-02-10"
+
+volume:
+  customer_count: 5000
+  active_subscription_rate: 0.95
+
+catalog:
+  path: generator/catalog.yml
+
+behavior:
+  subscriptions:
+    cancelled_rate: 0.06
+    past_due_rate: 0.03
+
+  invoicing:
+    tax_rate: 0.0
+
+  payments:
+    first_attempt_decline_rate: 0.08
+    retry_after_decline_rate: 0.90
+    max_attempts: 3
+    payment_method_weights:
+      CARD: 0.70
+      PAYPAL: 0.12
+      APPLE_PAY: 0.10
+      GOOGLE_PAY: 0.08
+
+  refunds:
+    capture_refund_rate: 0.04
+    amount_fraction_weights:
+      "0.20": 0.35
+      "0.50": 0.35
+      "1.00": 0.30
+    min_delay_days: 3
+    max_delay_days: 30
+
+  chargebacks:
+    capture_chargeback_rate: 0.005
+    min_delay_days: 7
+    max_delay_days: 45
+
+  settlements:
+    delay_days_weights:
+      "1": 0.20
+      "2": 0.50
+      "3": 0.25
+      "4": 0.05
+    variable_fee_bps: 290
+    fixed_fee_eur_minor: 30
+    psp_fx_spread_bps_min: 10
+    psp_fx_spread_bps_max: 60
+
+  bank:
+    posting_delay_days_weights:
+      "0": 0.20
+      "1": 0.65
+      "2": 0.15
+
+  accounting:
+    posting_delay_days_weights:
+      "0": 0.30
+      "1": 0.60
+      "2": 0.10
+
+fx_reference:
+  # CI uses a deterministic fixture. A later live/demo profile will use the ECB extractor cache.
+  mode: fixture
+  path: generator/fixtures/ecb_ci_rates.csv
+
+anomalies:
+  enabled: false
+  types:
+    duplicate_capture: 1
+    capture_amount_mismatch: 1
+    over_refund: 1
+    missing_settlement: 1
+    settlement_total_mismatch: 1
+    missing_bank_receipt: 1
+    bank_amount_mismatch: 1
+    missing_ledger_posting: 1
+    unbalanced_journal: 1
+    unmapped_product: 1
+    missing_fx_rate: 1
+    fx_rate_outlier: 1
+
+output:
+  root: data/generated
+  format: csv
+  include_control_manifest: true

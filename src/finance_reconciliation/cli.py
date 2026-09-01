@@ -21,7 +21,7 @@ from finance_reconciliation.generator.manifest import (
     write_manifest,
 )
 from finance_reconciliation.generator.pipeline import (
-    generate_clean_dataset,
+    generate_dataset,
     write_clean_dataset,
 )
 from finance_reconciliation.ingestion.loader import (
@@ -168,13 +168,13 @@ def generate(
         config_path
     )
 
-    dataset = generate_clean_dataset(
+    result = generate_dataset(
         config
     )
 
     counts = write_clean_dataset(
         config=config,
-        dataset=dataset,
+        dataset=result.dataset,
     )
 
     write_effective_config(
@@ -184,7 +184,8 @@ def generate(
     write_manifest(
         config=config,
         row_counts=counts,
-    )
+        anomalies=result.anomalies, 
+    )   
 
     typer.echo(
         f"Generated run: {config.run_id}"
