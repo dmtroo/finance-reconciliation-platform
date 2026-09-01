@@ -87,7 +87,12 @@ load-run:
 
 postgres-wait:
 	@echo "Waiting for PostgreSQL..."
-	@until docker compose exec -T postgres sh -lc 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' >/dev/null 2>&1; do sleep 1; done
+	@# -h 127.0.0.1 + a real query force a TCP client path: during a
+	@# fresh initdb the temporary server listens on the unix socket only,
+	@# so a socket pg_isready reports ready before the port clients
+	@# actually use is accepting connections.
+	@until docker compose exec -T postgres sh -lc 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' >/dev/null 2>&1; do sleep 1; done
+	@until docker compose exec -T postgres sh -lc 'psql -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -tAc "select 1"' >/dev/null 2>&1; do sleep 1; done
 	@echo "PostgreSQL is ready."
 
 m1-validate:
