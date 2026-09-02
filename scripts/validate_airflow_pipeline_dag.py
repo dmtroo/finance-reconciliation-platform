@@ -19,6 +19,7 @@ EXPECTED_TASK_IDS = {
     "dbt_intermediate",
     "dbt_marts",
     "validate_reconciliation",
+    "export_finance_report",
     "pipeline_complete",
 }
 

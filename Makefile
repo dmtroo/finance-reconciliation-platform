@@ -16,7 +16,7 @@ M5_ECB_FIXTURE ?= generator/fixtures/ecb_raw_ci_rates.csv
 AIRFLOW_COMPOSE := docker compose -f docker-compose.airflow.yml
 AIRFLOW_UID ?= $(shell id -u)
 
-.PHONY: airflow-workflow-acceptance airflow-reconciliation-check airflow-workflow-validate airflow-acceptance airflow-wait airflow-pipeline-check airflow-build airflow-reset airflow-down airflow-smoke airflow-logs airflow-ps airflow-init airflow-up m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+.PHONY: finance-report-scenarios finance-report-acceptance finance-report-validate finance-report-export airflow-workflow-acceptance airflow-reconciliation-check airflow-workflow-validate airflow-acceptance airflow-wait airflow-pipeline-check airflow-build airflow-reset airflow-down airflow-smoke airflow-logs airflow-ps airflow-init airflow-up m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -47,6 +47,10 @@ help:
 	@echo "  airflow-workflow-validate     Run the M6 pipeline DAG twice and check RAW idempotency + clean reconciliation"
 	@echo "  airflow-reconciliation-check  airflow-smoke + airflow-pipeline-check + airflow-workflow-validate"
 	@echo "  airflow-workflow-acceptance   Business-DB clean room, then airflow-reconciliation-check"
+	@echo "  finance-report-export         Export the Finance Excel report from the current marts"
+	@echo "  finance-report-validate       Check the exported report matches the marts"
+	@echo "  finance-report-acceptance     finance-report-export + finance-report-validate (marts must exist)"
+	@echo "  finance-report-scenarios      Build clean then anomaly marts and export/validate the report for each"
 
 validate-contract:
 	python scripts/validate_contract.py
@@ -274,3 +278,29 @@ airflow-workflow-acceptance:
 	$(MAKE) airflow-up
 	$(MAKE) airflow-wait
 	$(MAKE) airflow-reconciliation-check
+
+finance-report-export:
+	finance-recon report-export
+
+finance-report-validate:
+	python scripts/validate_finance_report.py
+
+# Downstream Excel consumer. Precondition: the reconciliation marts are
+# already built (orchestrated by m4/m5 acceptance or the Airflow DAG).
+finance-report-acceptance:
+	$(MAKE) finance-report-export
+	$(MAKE) finance-report-validate
+
+# One export mechanism, both mart states. Same output file is
+# overwritten each time.
+#   clean marts   -> export -> Exceptions = 0
+#   anomaly marts -> export -> Exceptions rows = mart rows, all 16 codes
+finance-report-scenarios:
+	$(MAKE) postgres-reset
+	$(MAKE) postgres-wait
+	$(MAKE) m4-acceptance
+	finance-recon report-export
+	python scripts/validate_finance_report.py --scenario clean
+	$(MAKE) m5-anomaly-pipeline
+	finance-recon report-export
+	python scripts/validate_finance_report.py --scenario with_anomalies

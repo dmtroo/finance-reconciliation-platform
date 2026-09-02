@@ -117,9 +117,10 @@ def run_reconciliation_validator() -> None:
     description=(
         "Generate Finance sources, "
         "load RAW data, build "
-        "reconciliation dbt layers, and "
-        "gate on the clean Finance "
-        "reconciliation contract."
+        "reconciliation dbt layers, gate "
+        "on the clean Finance "
+        "reconciliation contract, and "
+        "publish the Excel report."
     ),
     schedule=None,
     start_date=datetime(
@@ -214,6 +215,13 @@ def finance_reconciliation_pipeline():
         run_reconciliation_validator()
 
     @task()
+    def export_finance_report() -> None:
+        # Publishes the downstream Excel report - only reached after
+        # validate_reconciliation, so Finance never receives a report
+        # the pipeline already considers invalid.
+        run_finance_recon("report-export")
+
+    @task()
     def pipeline_complete() -> None:
         print(
             "Finance reconciliation "
@@ -253,6 +261,10 @@ def finance_reconciliation_pipeline():
         validate_reconciliation()
     )
 
+    reported = (
+        export_finance_report()
+    )
+
     completed = (
         pipeline_complete()
     )
@@ -270,6 +282,7 @@ def finance_reconciliation_pipeline():
         >> intermediate
         >> marts
         >> reconciled
+        >> reported
         >> completed
     )
 

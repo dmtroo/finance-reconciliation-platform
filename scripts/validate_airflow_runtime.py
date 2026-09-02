@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import time
 from pathlib import Path
 from urllib.request import urlopen
+
+# `airflow jobs check` reads the job's last heartbeat; under DAG-parse
+# load it can be momentarily stale even on a healthy service, so retry
+# briefly before failing.
+JOB_CHECK_ATTEMPTS = 6
+JOB_CHECK_DELAY_SECONDS = 5
 
 EXPECTED_RUNNING_SERVICES = {
     "airflow-postgres",
@@ -27,6 +34,29 @@ def run_command(
         check=True,
         capture_output=True,
         text=True,
+    )
+
+
+def run_job_check(
+    command: list[str],
+) -> None:
+    last_error: subprocess.CalledProcessError | None = None
+
+    for attempt in range(JOB_CHECK_ATTEMPTS):
+        try:
+            run_command(command)
+            return
+        except subprocess.CalledProcessError as error:
+            last_error = error
+
+            if attempt < JOB_CHECK_ATTEMPTS - 1:
+                time.sleep(JOB_CHECK_DELAY_SECONDS)
+
+    raise AirflowRuntimeValidationError(
+        "Airflow job heartbeat check failed after "
+        f"{JOB_CHECK_ATTEMPTS} attempts: "
+        f"{last_error.stdout if last_error else ''}"
+        f"{last_error.stderr if last_error else ''}"
     )
 
 
@@ -138,7 +168,7 @@ def validate_scheduler(
         ),
     ]
 
-    run_command(
+    run_job_check(
         command
     )
 
@@ -167,7 +197,7 @@ def validate_dag_processor(
         ),
     ]
 
-    run_command(
+    run_job_check(
         command
     )
 

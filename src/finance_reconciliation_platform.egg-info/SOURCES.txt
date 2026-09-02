@@ -3,6 +3,9 @@ pyproject.toml
 src/finance_reconciliation/__init__.py
 src/finance_reconciliation/cli.py
 src/finance_reconciliation/paths.py
+src/finance_reconciliation/ecb/__init__.py
+src/finance_reconciliation/ecb/extractor.py
+src/finance_reconciliation/ecb/loader.py
 src/finance_reconciliation/generator/__init__.py
 src/finance_reconciliation/generator/__main__.py
 src/finance_reconciliation/generator/accounting.py
@@ -25,6 +28,10 @@ src/finance_reconciliation/ingestion/loader.py
 src/finance_reconciliation/ingestion/parsing.py
 src/finance_reconciliation/ingestion/source_run.py
 src/finance_reconciliation/ingestion/specs.py
+src/finance_reconciliation/reporting/__init__.py
+src/finance_reconciliation/reporting/exporter.py
+src/finance_reconciliation/reporting/models.py
+src/finance_reconciliation/reporting/repository.py
 src/finance_reconciliation_platform.egg-info/PKG-INFO
 src/finance_reconciliation_platform.egg-info/SOURCES.txt
 src/finance_reconciliation_platform.egg-info/dependency_links.txt

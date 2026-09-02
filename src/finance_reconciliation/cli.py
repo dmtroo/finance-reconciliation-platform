@@ -27,6 +27,14 @@ from finance_reconciliation.generator.pipeline import (
 from finance_reconciliation.ingestion.loader import (
     load_run_directory,
 )
+from finance_reconciliation.reporting import (
+    export_finance_report,
+    load_finance_report_data,
+)
+
+DEFAULT_REPORT_OUTPUT = Path(
+    "reports/exports/finance_reconciliation_report.xlsx"
+)
 
 app = typer.Typer(
     help=(
@@ -225,6 +233,44 @@ def load_generated_run(
         typer.echo(
             f"{table}: {count:,} source rows"
         )
+
+
+@app.command("report-export")
+def report_export(
+    output: Annotated[
+        Path,
+        typer.Option(
+            "--output",
+            help=(
+                "Excel workbook path for the "
+                "Finance reconciliation report."
+            ),
+        ),
+    ] = DEFAULT_REPORT_OUTPUT,
+) -> None:
+    # Assumes the reconciliation marts already exist; orchestrating the
+    # dbt dependency is the job of Airflow / the Makefile, not this
+    # command.
+    data = load_finance_report_data()
+
+    result = export_finance_report(
+        data,
+        output_path=output,
+    )
+
+    typer.echo(
+        "Finance reconciliation report exported."
+    )
+    typer.echo(
+        f"Output: {result.output_path}"
+    )
+    typer.echo(
+        f"Daily rows: {result.daily_row_count:,}"
+    )
+    typer.echo(
+        "Exception rows: "
+        f"{result.exception_row_count:,}"
+    )
 
 
 def main() -> None:
