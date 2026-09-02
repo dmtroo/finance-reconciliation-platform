@@ -31,3 +31,7 @@ data/external/*
 # Airflow runtime
 airflow/logs/*
 !airflow/logs/.gitkeep
+
+# Finance reporting output (regenerated from current mart state)
+reports/exports/*
+!reports/exports/.gitkeep

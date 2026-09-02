@@ -1,185 +1,260 @@
 # Finance Reconciliation Platform
 
-A production-like data project for automating finance reconciliation in a multi-currency
-subscription business.
+An end-to-end Finance reconciliation platform for a multi-currency
+subscription business. It connects Billing, PSP settlement, bank cash
+receipts, accounting postings and ECB reference FX, then surfaces the
+reconciliation exceptions Finance needs to investigate — automatically
+and reproducibly.
 
-The project is designed around a real finance question:
+The data is **synthetic and deterministic**: a generator builds a
+complete, internally consistent source ecosystem so the reconciliation
+controls can be exercised safely, repeatably, and with a known expected
+answer.
 
-> Can Finance explain the path from invoice, to captured payment, to PSP settlement, to bank cash,
-> and to accounting posting — and automatically identify the exceptions that need investigation?
+## The Finance problem
 
-## Current milestone: M0 — bootstrap and source contract
+> Can Finance explain every amount along the path
+> **invoice → captured payment → PSP settlement → bank cash → accounting
+> posting**, reconciled against a standardized management FX rate, and
+> automatically identify the exceptions that need investigation?
 
-Implemented now:
+Each of those steps lives in a different system, each system can
+disagree with the others, and the disagreements are exactly what a
+reconciliation function must find. This project builds that pipeline.
 
-- source-aligned PostgreSQL RAW schemas;
-- 10-table source data contract;
-- dbt project shell with source documentation, source tests, and freshness SLAs;
-- deterministic synthetic-generator specification and machine-readable configuration schema;
-- local Docker Compose PostgreSQL environment;
-- staged development roadmap.
+## Business flow
 
-Not implemented yet by design:
+```text
+Product
+  └─ Subscription
+       └─ Invoice
+            └─ Payment Attempt
+                 └─ Financial Event   (CAPTURE / REFUND / CHARGEBACK)
+                      └─ Settlement Item
+                           └─ Settlement Batch
+                                └─ Bank Transaction        (actual cash)
+                                └─ Accounting Journal      (GL postings)
 
-- synthetic-data generator code;
-- loaders / ECB extractor;
-- dbt staging/intermediate/marts SQL;
-- Airflow DAGs;
-- GitHub Actions.
+ECB reference rates ─────────────────────────► management EUR value
+```
 
-Those are subsequent milestones so each layer is built against a stable upstream contract.
+## Source systems
+
+| System | What it provides |
+| --- | --- |
+| **Billing** | products, subscriptions, invoices |
+| **PSP** | payment attempts, financial events, settlement batches and items, PSP settlement FX and fees |
+| **Bank** | the actual cash receipt for each payout |
+| **Accounting** | journal postings for each event and settlement |
+| **ECB** | standardized management / reference FX |
+
+## Source of truth
+
+| Concept | Authoritative system |
+| --- | --- |
+| Product / subscription / invoice | Billing |
+| Payment outcome (capture / refund / chargeback) | PSP |
+| PSP fee / payout / PSP FX | PSP settlement |
+| Actual cash received | Bank |
+| Accounting postings | Accounting |
+| Standardized management FX | ECB |
+
+**Sources never silently overwrite each other.** When two authoritative
+systems disagree, the disagreement is preserved through the warehouse
+and becomes a reconciliation exception rather than being smoothed away.
 
 ## Architecture
 
 ```text
-Billing ─┐
-PSP ─────┼──> Python ingestion ──> PostgreSQL RAW ──> dbt ──> Finance marts / controls
-Bank ────┤
-Accounting┘
+Synthetic private sources          External source
+Billing / PSP / Bank / Accounting  ECB extractor (fixture in CI)
+                │                         │
+                ▼                         ▼
+        Python ingestion  (extraction + idempotent load only)
+                │
+                ▼
+        PostgreSQL RAW   (raw_billing / raw_psp / raw_bank / raw_accounting / raw_ecb)
+                │
+                ▼   dbt
+     staging ──► intermediate ──► facts / marts
+                                     │
+                                     ▼
+                       Finance validation (M4 contract)
+                                     │
+                                     ▼
+                       Excel report  (Daily Summary + Exceptions)
 
-ECB API ─────> ECB extractor ────> raw_ecb ─────────^ 
+Airflow ─────────► orchestrates the components above (no Finance SQL)
+GitHub Actions ──► validates the repository on every pull request
 ```
 
-Transformation layering follows `staging -> intermediate -> marts`. Only staging models may read
-RAW sources directly.
+## Data layers
 
-## Repository layout
+| Layer | Contains |
+| --- | --- |
+| **RAW** | exactly what the source system said, including bad-but-real rows |
+| **Staging** | one cleaned, typed view per RAW table — rename/cast, minor units → `NUMERIC(18,2)`, UTC timestamps, event sign convention. Only staging may call `source()` |
+| **Intermediate** | cross-system wiring and reusable Finance logic — as-of FX, capture lifecycle, payment→settlement matching, settlement→bank matching, accounting matching |
+| **Facts** | the full reconciliation picture on a stable grain |
+| **Marts** | Finance-facing outputs |
+
+## Final marts
+
+| Model | Grain | Purpose |
+| --- | --- | --- |
+| `fct_payment_reconciliation` | one successful capture | invoice → payment → settlement → accounting context and control outcomes |
+| `fct_settlement_reconciliation` | one PSP settlement | settlement header/items → bank cash → accounting |
+| `mart_reconciliation_exceptions` | one reconciliation exception | the Finance investigation queue |
+| `mart_finance_daily` | business_date × product × currency | daily reconciliation KPI monitoring |
+
+## Exception taxonomy
+
+16 frozen control codes across six groups:
+
+| Group | Codes |
+| --- | --- |
+| Payment lifecycle | `MISSING_CAPTURE`, `CAPTURE_AMOUNT_MISMATCH`, `DUPLICATE_CAPTURE`, `INVALID_REFUND`, `OVER_REFUND` |
+| Settlement | `MISSING_SETTLEMENT`, `LATE_SETTLEMENT`, `SETTLEMENT_TOTAL_MISMATCH` |
+| Bank | `MISSING_BANK_RECEIPT`, `BANK_AMOUNT_MISMATCH` |
+| Accounting | `MISSING_LEDGER_POSTING`, `LEDGER_AMOUNT_MISMATCH`, `UNBALANCED_JOURNAL` |
+| FX | `MISSING_FX_RATE`, `FX_RATE_OUTLIER` |
+| Product mapping | `UNMAPPED_PRODUCT` |
+
+Business meaning, trigger conditions and status/severity policy for each:
+see [`docs/finance-reconciliation-controls.md`](docs/finance-reconciliation-controls.md).
+
+## Deterministic anomaly testing
+
+| Scenario | Injected anomalies | Distinct exception codes | Result |
+| --- | --- | --- | --- |
+| `clean` | 0 | 0 | fully reconciled, 100% amount reconciliation rate |
+| `with_anomalies` | 16 deterministic source mutations | 16 | every control type triggered downstream |
+
+**Anomalies are injected into source records, not into the exception
+mart.** `with_anomalies` starts from a valid clean dataset and applies
+one deterministic mutation per control, selected by stable hashing of
+`(seed, anomaly_type, ordinal)`. The exception mart may hold more than
+16 rows because one source mutation can legitimately trip more than one
+control.
+
+## Orchestration (Airflow)
+
+`finance_reconciliation_pipeline` DAG:
 
 ```text
-.
-├── infra/postgres/init/       # versioned local RAW DDL
-├── dbt/
-│   ├── dbt_project.yml
-│   ├── profiles.yml.example
-│   ├── models/staging/*       # source declarations now; SQL follows in M2
-│   └── tests/generic/
-├── generator/                 # exact synthetic-source specification
-├── ingestion/                 # implementation starts in M1
-├── airflow/dags/              # implementation starts in M5
-├── docs/
-└── data/generated/            # generated files are gitignored
+generate sources ─► load RAW + ECB ─► dbt staging ─► dbt intermediate ─►
+dbt marts ─► validate reconciliation ─► export finance report ─► done
 ```
 
-## Local bootstrap
+Airflow orchestrates the existing `finance-recon` CLI, dbt and the
+validators. It contains no Finance SQL. `export finance report` runs
+only after `validate reconciliation` passes, so Finance never receives a
+report the pipeline already considers invalid.
 
-1. Create the local environment file:
+## Idempotency
+
+Same `seed` + config + catalog + FX input → the same source data.
+Ingestion is idempotent on natural source keys, so repeated loads add no
+duplicate business rows. Running the DAG twice with no database reset
+leaves RAW row counts unchanged and the clean Finance result unchanged.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` — one workflow, three jobs, on every pull
+request and on `main`:
+
+| Job | Proves |
+| --- | --- |
+| `quality` | lint, unit tests, repository contract alignment |
+| `finance-integration` | full M0–M5 acceptance on a fresh PostgreSQL, plus the anomaly-state report showing all 16 exception codes |
+| `airflow-integration` | the DAG runs twice on a clean runner — RAW idempotency, clean reconciliation, clean report |
+
+See [`docs/m6-ci.md`](docs/m6-ci.md).
+
+## Finance report
+
+`finance-recon report-export` reads the current marts and writes
+`reports/exports/finance_reconciliation_report.xlsx`:
+
+| Sheet | Use |
+| --- | --- |
+| **Daily Summary** | one row per `mart_finance_daily` row — daily KPI view |
+| **Exceptions** | one row per `mart_reconciliation_exceptions` row — investigation queue, with the identifiers to chase a specific invoice / payment / settlement |
+
+The workbook is **presentation only**. All reconciliation logic stays in
+dbt; the export never recomputes anything. Clean DB → clean workbook;
+anomaly DB → the same export shows the exception rows. See
+[`docs/m6-finance-reporting.md`](docs/m6-finance-reporting.md).
+
+## Tech stack
+
+Python · PostgreSQL · dbt · Apache Airflow · Docker Compose ·
+GitHub Actions · `openpyxl`. The project optimizes for auditability and
+maintainability, not tool count.
+
+## How to run
+
+Prerequisites: Docker, Python 3.13, `pip install -e ".[dbt,dev]"`,
+`cp .env.example .env`, `make dbt-profile`.
+
+**Everything, one command:**
 
 ```bash
-cp .env.example .env
+make final-acceptance
 ```
 
-2. Start PostgreSQL:
+Runs the complete local acceptance sequence — repository quality,
+Finance reconciliation (clean + anomaly), Airflow orchestration on a
+fresh runtime, repeated-run idempotency and Finance reporting
+validation. See [`docs/m6-final-acceptance.md`](docs/m6-final-acceptance.md).
+The phases below are the same steps, run individually.
+
+**Finance reconciliation (M0–M5), clean + anomaly:**
 
 ```bash
-make postgres-up
+make m5-acceptance
 ```
 
-On the first creation of the Docker volume, PostgreSQL executes the numbered scripts in
-`infra/postgres/init/` and creates the five RAW schemas and ten source tables.
-
-3. Create a local dbt profile:
+**The report, both mart states:**
 
 ```bash
-make dbt-profile
+make finance-report-scenarios
 ```
 
-4. After installing the Python/dbt dependencies, validate connectivity:
+**Airflow orchestration end to end:**
 
 ```bash
-make dbt-debug
+make airflow-acceptance             # build + start + DAG contract
+make airflow-workflow-acceptance    # run the DAG twice + all validators
 ```
 
-`dbt source freshness` and source tests become meaningful after M1 loads data:
+## Demo dataset
 
-```bash
-make dbt-source-freshness
-make dbt-test-sources
-```
+The CI / local profile generates a ~30-day window: 6 products,
+~4,700 subscriptions, ~4,200 invoices, ~4,500 payment attempts,
+~4,300 financial events, 34 settlement batches, ~8,600 journal lines.
+The demo profile in `generator/SPEC.md` scales to ~100k–250k invoices
+over a year through customer volume, not row duplication.
 
-## Destructive local reset
+## Out of scope (by design)
 
-The Docker init scripts run only when the PostgreSQL volume is first initialized. During early schema
-development, apply a clean rebuild with:
+IFRS 15 revenue recognition, deferred revenue, a VAT engine, fraud
+scoring, churn / customer analytics, a full ERP / general ledger, tax
+jurisdiction handling, PSP dispute fees, PII. These are deliberate scope
+controls.
 
-```bash
-make postgres-reset
-```
+## Documentation
 
-This is intentionally destructive and is for local development only. Schema changes must still be
-added as new numbered SQL files rather than editing a deployed migration in place once history matters.
-
-## Engineering principles
-
-- RAW preserves upstream truth, including business-quality problems.
-- Source tests validate shape and controlled vocabularies; reconciliation controls validate business behavior.
-- Money is never stored as floating point.
-- Technical timestamps are UTC; business dates remain explicit dates.
-- ECB reporting FX and PSP settlement FX are distinct concepts.
-- Synthetic data is deterministic and includes natural finance behavior before injected anomalies.
-- The project optimizes for auditability and maintainability, not maximum tool count.
-
-See `docs/source-data-contract.md`, `docs/architecture.md`, and `generator/SPEC.md` for the frozen M0 design.
-
-## Local M1 acceptance
-
-The complete synthetic-source and RAW-ingestion milestone can be
-validated locally with:
-
-```bash
-make postgres-reset
-make postgres-wait
-make m1-acceptance
-```
-
-See `docs/m1-acceptance.md` for the acceptance contract and scope.
-
-## Local M2 acceptance
-
-The complete RAW-to-staging milestone can be reproduced with:
-
-```bash
-make postgres-reset
-make postgres-wait
-make m2-acceptance
-```
-
-M2 builds 10 dbt staging views and validates their grain, numeric types,
-and source-only lineage.
-
-See `docs/m2-acceptance.md` for the staging contract.
-
-## Local M3 acceptance
-
-The complete staging-to-intermediate finance milestone can be reproduced
-with:
-
-```bash
-make postgres-reset
-make postgres-wait
-make m3-acceptance
-```
-
-M3 validates as-of FX, payment lifecycle, settlement and bank matching,
-and accounting matching foundations without assigning final
-reconciliation exception codes.
-
-See `docs/m3-acceptance.md` for the intermediate-layer contract.
-
-## Local M4 acceptance
-
-The complete Finance reconciliation milestone can be reproduced with:
-
-```bash
-make postgres-reset
-make postgres-wait
-make m4-acceptance
-```
-
-M4 validates the payment and settlement reconciliation facts, the
-exception mart, and the daily Finance reporting mart.
-
-For the deterministic clean scenario, the acceptance contract requires
-zero reconciliation exceptions, zero unvalued captures, and a 100%
-amount-based reconciliation rate for valued capture volume.
-
-See `docs/m4-acceptance.md` for the complete reconciliation contract.
+| Topic | Document |
+| --- | --- |
+| Why the system is built this way | [`docs/architecture.md`](docs/architecture.md) |
+| The 16 reconciliation controls | [`docs/finance-reconciliation-controls.md`](docs/finance-reconciliation-controls.md) |
+| 5–10 minute walkthrough | [`docs/demo-guide.md`](docs/demo-guide.md) |
+| One-command final acceptance | [`docs/m6-final-acceptance.md`](docs/m6-final-acceptance.md) |
+| RAW source contract | [`docs/source-data-contract.md`](docs/source-data-contract.md) |
+| Generator specification | [`generator/SPEC.md`](generator/SPEC.md) |
+| Anomaly injection & validation | [`docs/m5-anomaly-validation.md`](docs/m5-anomaly-validation.md) |
+| Airflow workflow validation | [`docs/m6-airflow-workflow-validation.md`](docs/m6-airflow-workflow-validation.md) |
+| Continuous integration | [`docs/m6-ci.md`](docs/m6-ci.md) |
+| Finance reporting export | [`docs/m6-finance-reporting.md`](docs/m6-finance-reporting.md) |
+| Per-milestone acceptance contracts | `docs/m1-acceptance.md` … `docs/m5-acceptance.md` |

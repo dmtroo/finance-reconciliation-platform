@@ -16,7 +16,7 @@ M5_ECB_FIXTURE ?= generator/fixtures/ecb_raw_ci_rates.csv
 AIRFLOW_COMPOSE := docker compose -f docker-compose.airflow.yml
 AIRFLOW_UID ?= $(shell id -u)
 
-.PHONY: airflow-workflow-acceptance airflow-reconciliation-check airflow-workflow-validate airflow-acceptance airflow-wait airflow-pipeline-check airflow-build airflow-reset airflow-down airflow-smoke airflow-logs airflow-ps airflow-init airflow-up m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
+.PHONY: final-acceptance final-quality-check final-finance-check final-airflow-check finance-report-scenarios finance-report-acceptance finance-report-validate finance-report-export airflow-workflow-acceptance airflow-reconciliation-check airflow-workflow-validate airflow-acceptance airflow-wait airflow-pipeline-check airflow-build airflow-reset airflow-down airflow-smoke airflow-logs airflow-ps airflow-init airflow-up m5-acceptance m5-validate m5-anomaly-validate m5-anomaly-pipeline m4-acceptance m4-validate dbt-build-marts m3-acceptance m3-validate dbt-build-intermediate m2-acceptance m2-validate dbt-build-staging m1-acceptance m1-validate postgres-wait load-run help test lint validate-contract postgres-up postgres-down postgres-reset dbt-profile dbt-debug dbt-source-freshness dbt-test-sources
 
 help:
 	@echo "Available targets:"
@@ -47,6 +47,11 @@ help:
 	@echo "  airflow-workflow-validate     Run the M6 pipeline DAG twice and check RAW idempotency + clean reconciliation"
 	@echo "  airflow-reconciliation-check  airflow-smoke + airflow-pipeline-check + airflow-workflow-validate"
 	@echo "  airflow-workflow-acceptance   Business-DB clean room, then airflow-reconciliation-check"
+	@echo "  finance-report-export         Export the Finance Excel report from the current marts"
+	@echo "  finance-report-validate       Check the exported report matches the marts"
+	@echo "  finance-report-acceptance     finance-report-export + finance-report-validate (marts must exist)"
+	@echo "  finance-report-scenarios      Build clean then anomaly marts and export/validate the report for each"
+	@echo "  final-acceptance              One command: repository quality + Finance + Airflow end-to-end acceptance"
 
 validate-contract:
 	python scripts/validate_contract.py
@@ -274,3 +279,73 @@ airflow-workflow-acceptance:
 	$(MAKE) airflow-up
 	$(MAKE) airflow-wait
 	$(MAKE) airflow-reconciliation-check
+
+finance-report-export:
+	finance-recon report-export
+
+finance-report-validate:
+	python scripts/validate_finance_report.py
+
+# Downstream Excel consumer. Precondition: the reconciliation marts are
+# already built (orchestrated by m4/m5 acceptance or the Airflow DAG).
+finance-report-acceptance:
+	$(MAKE) finance-report-export
+	$(MAKE) finance-report-validate
+
+# One export mechanism, both mart states. Same output file is
+# overwritten each time.
+#   clean marts   -> export -> Exceptions = 0
+#   anomaly marts -> export -> Exceptions rows = mart rows, all 16 codes
+finance-report-scenarios:
+	$(MAKE) postgres-reset
+	$(MAKE) postgres-wait
+	$(MAKE) m4-acceptance
+	finance-recon report-export
+	python scripts/validate_finance_report.py --scenario clean
+	$(MAKE) m5-anomaly-pipeline
+	finance-recon report-export
+	python scripts/validate_finance_report.py --scenario with_anomalies
+
+# --- Final project acceptance ---------------------------------------------
+# One canonical end-to-end command. Phases run strictly sequentially
+# because the Finance and Airflow acceptance targets each reset the
+# business PostgreSQL. Each phase reuses existing targets - no validation
+# logic is re-implemented here.
+
+# Phase 1: repository health. Fast; fails before any Docker work.
+final-quality-check:
+	$(MAKE) lint
+	$(MAKE) test
+	$(MAKE) validate-contract
+
+# Phase 2: Finance reconciliation without orchestration - clean
+# (0 exceptions, 100% reconciliation) and with_anomalies (16 injections,
+# all 16 control codes). m5-acceptance owns its own DB reset.
+final-finance-check:
+	$(MAKE) m5-acceptance
+
+# Phase 3: build the Airflow runtime from repository state on a clean
+# metadata DB, then prove the DAG contract and a repeated real workflow.
+# airflow-workflow-acceptance already resets the business DB, runs
+# airflow-smoke + airflow-pipeline-check, triggers the DAG twice, and
+# runs the M4 + report validators - so they are not repeated here.
+final-airflow-check:
+	$(MAKE) airflow-reset
+	$(MAKE) airflow-build
+	$(MAKE) airflow-init
+	$(MAKE) airflow-workflow-acceptance
+
+final-acceptance:
+	$(MAKE) final-quality-check
+	$(MAKE) final-finance-check
+	$(MAKE) final-airflow-check
+	@echo
+	@echo "Final project acceptance passed."
+	@echo
+	@echo "  Repository quality:                  passed."
+	@echo "  Finance clean/anomaly acceptance:    passed."
+	@echo "  Airflow runtime and DAG contract:    passed."
+	@echo "  Airflow repeated workflow:           passed."
+	@echo "  Finance reporting export:            passed."
+	@echo
+	@echo "Airflow is left running (http://localhost:8081). Clean up with: make airflow-reset"

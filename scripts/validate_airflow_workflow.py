@@ -21,6 +21,10 @@ DEFAULT_POLL_SECONDS = 5
 
 RUNTIME_VALIDATOR = "scripts/validate_airflow_runtime.py"
 RECONCILIATION_VALIDATOR = "scripts/validate_m4.py"
+REPORT_VALIDATOR = "scripts/validate_finance_report.py"
+REPORT_PATH = Path(
+    "reports/exports/finance_reconciliation_report.xlsx"
+)
 
 TERMINAL_SUCCESS = "success"
 TERMINAL_FAILURE = "failed"
@@ -282,6 +286,36 @@ def run_reconciliation_validator() -> None:
         )
 
 
+def run_report_validator() -> None:
+    # The DAG's export_finance_report task wrote the workbook (bind mount);
+    # reuse the standalone report validator rather than re-checking it here.
+    if not REPORT_PATH.exists():
+        raise AirflowWorkflowValidationError(
+            "Airflow run did not publish the Finance report: "
+            f"{REPORT_PATH}"
+        )
+
+    # The production DAG always runs the clean pipeline.
+    result = subprocess.run(
+        [
+            sys.executable,
+            REPORT_VALIDATOR,
+            "--scenario",
+            "clean",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        raise AirflowWorkflowValidationError(
+            "Finance report validation failed after repeated "
+            "Airflow run:\n"
+            f"{result.stdout}{result.stderr}"
+        )
+
+
 def diff_snapshots(
     first: dict[str, int],
     second: dict[str, int],
@@ -376,6 +410,9 @@ def validate_airflow_workflow(
 
     run_reconciliation_validator()
     print("Clean reconciliation validation: passed.")
+
+    run_report_validator()
+    print("Finance report: matches the marts after the repeated run.")
 
     print()
     print("Airflow reconciliation workflow validation passed.")

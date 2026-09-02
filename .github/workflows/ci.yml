@@ -74,6 +74,14 @@ jobs:
       - name: Finance reconciliation acceptance (M0-M5)
         run: make m5-acceptance
 
+      # m5-acceptance leaves the marts in the with_anomalies state.
+      # airflow-integration covers the clean-scenario report; here the
+      # same export must surface every frozen anomaly exception code.
+      - name: Finance report (with_anomalies)
+        run: |
+          make finance-report-export
+          python scripts/validate_finance_report.py --scenario with_anomalies
+
       - name: Diagnostics
         if: failure()
         run: |
