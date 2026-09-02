@@ -197,6 +197,18 @@ maintainability, not tool count.
 Prerequisites: Docker, Python 3.13, `pip install -e ".[dbt,dev]"`,
 `cp .env.example .env`, `make dbt-profile`.
 
+**Everything, one command:**
+
+```bash
+make final-acceptance
+```
+
+Runs the complete local acceptance sequence — repository quality,
+Finance reconciliation (clean + anomaly), Airflow orchestration on a
+fresh runtime, repeated-run idempotency and Finance reporting
+validation. See [`docs/m6-final-acceptance.md`](docs/m6-final-acceptance.md).
+The phases below are the same steps, run individually.
+
 **Finance reconciliation (M0–M5), clean + anomaly:**
 
 ```bash
@@ -238,6 +250,7 @@ controls.
 | Why the system is built this way | [`docs/architecture.md`](docs/architecture.md) |
 | The 16 reconciliation controls | [`docs/finance-reconciliation-controls.md`](docs/finance-reconciliation-controls.md) |
 | 5–10 minute walkthrough | [`docs/demo-guide.md`](docs/demo-guide.md) |
+| One-command final acceptance | [`docs/m6-final-acceptance.md`](docs/m6-final-acceptance.md) |
 | RAW source contract | [`docs/source-data-contract.md`](docs/source-data-contract.md) |
 | Generator specification | [`generator/SPEC.md`](generator/SPEC.md) |
 | Anomaly injection & validation | [`docs/m5-anomaly-validation.md`](docs/m5-anomaly-validation.md) |

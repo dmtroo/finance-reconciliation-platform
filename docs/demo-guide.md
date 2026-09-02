@@ -6,6 +6,18 @@ Prerequisites: Docker running, Python 3.13, `pip install -e ".[dbt,dev]"`,
 `cp .env.example .env`, `make dbt-profile`. If port 5432 is taken by
 another project, set `POSTGRES_PORT` in `.env`.
 
+**Before the demo**, run the full acceptance once so the environment is
+built and green:
+
+```bash
+make final-acceptance
+```
+
+It leaves the business DB in the clean state, Airflow running, and a
+clean `finance_reconciliation_report.xlsx` on disk — exactly the state
+the walkthrough below assumes. See
+[`m6-final-acceptance.md`](m6-final-acceptance.md).
+
 ---
 
 ## Step 1 — Architecture (1 min)
